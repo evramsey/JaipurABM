@@ -54,8 +54,6 @@ public class JaipurABM extends SimState{
 	static ArrayList<Household> neighborArray = new ArrayList<Household>();
 	Household neighborHousehold = new Household();
 
-
-
 	public JaipurABM(long seed){
 		super(seed);
 	}
@@ -65,6 +63,8 @@ public class JaipurABM extends SimState{
 		scanInputCSV.readInData(dataSourceFile);
 		System.out.println("num skipped steps " + numStepsSkippedToUpdateFunctions);
 		for(int job = 0; job < jobs; job++){
+			initialize_agents();
+
 			System.out.println("JOB NUMBER " + job);
 			state.schedule.clear();
 			state.setJob(job);
@@ -82,21 +82,23 @@ public class JaipurABM extends SimState{
 				}
 			while(state.schedule.getSteps() < numStepsInMain);
 			state.finish();
-			numTotalAgents = 0;
-			vertexNumber = 0;
-			newAgentsAtThisTimeStepOriginalNetwork.clear();
-			for (Household hh : network){
-				hh.clearAllNetworks();
-			}
-			network.clear();
-			neighborArray.clear();
-			System.out.println("NETWORKS ALL CLEARED");
-
 		}
 		txtFileInput = txtFileInput + DataCollector.txtFileInput;
 		generateTxtFile(txtFileInput);
 		System.out.println("all runs finished, exiting");
 		System.exit(0);
+	}
+
+	public static void initialize_agents(){
+		network = new ArrayList<Household>();
+		newAgentsAtThisTimeStepOriginalNetwork = new ArrayList<Household>();
+		neighborArray = new ArrayList<Household>();
+
+		Household.houseHoldAgents = new ArrayList<>();
+
+		numTotalAgents = 0;
+		vertexNumber = 0;
+		System.out.println("Network agents initialized");
 	}
 
 
@@ -137,13 +139,15 @@ public class JaipurABM extends SimState{
 	protected void createAgentPopulation(int [][] populationArray){
 		int numTimeSteps = populationArray.length;
 		for (int i = 0; i < numTimeSteps; i++){											//for each time step i
-			newAgentsAtThisTimeStepOriginalNetwork.clear();											//remove all old agents from new agent array
+			newAgentsAtThisTimeStepOriginalNetwork.clear();								//remove all old agents from new agent array
 			double double_i = (double) (i);
 			population = populationArray[i][1];
 			int numNewAgents = getNumNewAgents(populationArray, double_i);
-			for (int j = 0; j < numNewAgents; j++){	//create number of new agents required
+			for (int j = 0; j < numNewAgents; j++){										//create number of new agents required
 				//System.out.println(" num newAgents: " + getNumNewAgents(populationArray, double_i));
 				Household newAgent = createNewAgent(populationArray, double_i);
+
+				// TODO is this ever used?
 				Household.houseHoldAgents.add(newAgent);
 
 				schedule.scheduleRepeating(double_i, newAgent);
@@ -247,9 +251,7 @@ public class JaipurABM extends SimState{
 				if(agentName.equals(nodePseudonym)){
 					hh.acquaintances = findNeighborArray(n);
 				}
-
 			}
-
 		}
 	}
 

@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections15.Factory;
 import org.apache.commons.math3.distribution.PoissonDistribution;
@@ -36,9 +37,11 @@ public class Household implements Steppable {
 	public int maxNumFamilyMembers;
 	public int maxNumCloseFriends;
 	public int maxNumConnections;
-	public int maxNumAcquaintances; 
-	
-	protected UUID uuid;//Unique ID for this particular agent
+	public int maxNumAcquaintances;
+
+    private int remainingConnections;
+
+    protected UUID uuid;//Unique ID for this particular agent
 	protected ArrayList<Household> acquaintances = new ArrayList<Household>();
 	protected ArrayList<Household> closeFriends = new ArrayList<Household>();
 	protected ArrayList<Household> respectedFamilyMembers = new ArrayList<Household>();//An array of IDs for agents that are in this agent's network
@@ -69,13 +72,46 @@ public class Household implements Steppable {
 //		maxNumConnections = 8;
 //		maxNumFamilyMembers = 4;
 //		maxNumCloseFriends = 2;
+
 		maxNumConnections = ValueGenerator.getValueWithRange(48.0, 27.0, 11, 185);//max num connections/social network size
 		maxNumFamilyMembers = ValueGenerator.getValueWithRange(5.48, 1.8, 0, 10);//family network, from latrine study
 		maxNumCloseFriends = ValueGenerator.getValueWithRange(2.64, 2.16, 0, 10);//friend network, from latrine study
+		maxNumAcquaintances = maxNumConnections - maxNumFamilyMembers - maxNumCloseFriends;
+		if(maxNumAcquaintances < 0) {
+            maxNumAcquaintances = 0;
+        }
+
+        setRemainingConnections();
 
 		uuid = UUID.randomUUID(); //set uuid
 		timeStepBorn = timeStep;
 	}
+
+	public int getRemainingConnections(){
+		int nExistingConnections = respectedFamilyMembers.size() + closeFriends.size() + acquaintances.size();
+        remainingConnections = maxNumConnections - nExistingConnections;
+
+		if (nExistingConnections > maxNumConnections){
+			 System.out.println("Household has more connections (" + nExistingConnections
+					+ ") than maximum allowed connections (" + maxNumConnections + ")");
+		}
+//		else{
+        return remainingConnections;
+//		}
+	}
+
+    public void setRemainingConnections(){
+        int nExistingConnections = respectedFamilyMembers.size() + closeFriends.size() + acquaintances.size();
+        remainingConnections = maxNumConnections - nExistingConnections;
+
+        if (nExistingConnections > maxNumConnections){
+            System.out.println("Household has more connections (" + nExistingConnections
+                    + ") than maximum allowed connections (" + maxNumConnections + ")");
+        }
+//		else{
+//		}
+    }
+
 
 	public void step(SimState state) {
 		prepareStep(state);
@@ -243,148 +279,144 @@ public class Household implements Steppable {
 		}
 	}
 
+    protected void prepareStep(SimState state){
+        String graphStructure = JaipurABM.getGraphStructure();
+        if (graphStructure.equalsIgnoreCase("original")){
+            double timeStep = state.schedule.getTime();
+            assignFamilyToAgentAtTimeStep(timeStep);
+            assignCloseFriendsAtTimeStep(timeStep);
+            assignAcquaintancesToAgentAtTimeStep(timeStep);
+//          String msg = String.format("Household %1$s, TimeStep %2$f, family %3$d, friends %4$d, acquaintences %5$d"
+//              , vertexName, timeStep, respectedFamilyMembers.size(), closeFriends.size(), acquaintances.size());
+//		    System.out.println(msg);
+        }
+//        if (vertexName.equals("vert1") && state.schedule.getTime() == 1.0) {
+//            System.out.println("TimeStep: " + state.schedule.getTime());
+//            System.out.println("acquaintances for " + this.vertexName + ":");
+//            for (Household hh : acquaintances) {
+//                System.out.print(hh.vertexName + " ");
+//            }
+//            System.out.println();
+//            System.out.println("friends for " + this.vertexName + ":");
+//
+//            for (Household hh : closeFriends) {
+//                System.out.print(hh.vertexName + " ");
+//            }
+//            System.out.println();
+//            System.out.println("family for " + this.vertexName + ":");
+//            for (Household hh : respectedFamilyMembers) {
+//                System.out.print(hh.vertexName + " ");
+//            }
+//            System.out.println();
+//        }
+    }
 
+    public void assignAcquaintancesToAgentAtTimeStep(double timeStep) {
+        if (acquaintances.size() == maxNumAcquaintances || remainingConnections <= 0) {
+            return;
+        }
 
-	protected void prepareStep(SimState state){
-		setNetworkSize();
-		//		System.out.println("agent " + this.vertexName + " maxNumConnections: " + this.maxNumConnections
-		//				+ " maxNumAcq: " + this.maxNumAcquaintances + " maxNumFam: " + this.maxNumFamilyMembers
-		//				+ " maxNumFriends: " + this.maxNumCloseFriends);
-		String graphStructure = JaipurABM.getGraphStructure();
-		if (graphStructure.equalsIgnoreCase("original")){
-			assignFamilyToAgentAtTimeStep(state.schedule.getTime());
-			assignCloseFriendsAtTimeStep(state.schedule.getTime());
-			assignAcquaintancesToAgentAtTimeStep(state.schedule.getTime());
-		}
-//			System.out.println("acquaintances for " + this.vertexName + ":");
-//			for (Household hh: acquaintances){
-//				System.out.print(hh.vertexName + " ");			
-//			}
-//			System.out.println();
-//			System.out.println("friends for " + this.vertexName + ":");
-//			for (Household hh: closeFriends){
-//				System.out.print(hh.vertexName + " ");
-//			}
-//			System.out.println();
-//			System.out.println("family for " + this.vertexName + ":");
-//			for (Household hh: respectedFamilyMembers){
-//				System.out.print(hh.vertexName + " ");
-//			}
-//		}
-//		System.out.println("acquaintances for " + this.vertexName + ":");
-//		for (Household hh: acquaintances){
-//			System.out.print(hh.vertexName + " ");
-//		}
-//		System.out.println();
-	}
+        List<Household> houseHoldAgentsShuffled = new ArrayList<Household>(houseHoldAgents);
+        // Shuffle this list (friends assigned to random agents)
+        Collections.shuffle(houseHoldAgentsShuffled);
 
-	public void assignAcquaintancesToAgentAtTimeStep(double timeStep) {
-		if (acquaintances.size() == maxNumAcquaintances) {
-			return;
-		}
+        List<Household> hh1 = houseHoldAgents.stream()
+                .filter(h -> h.uuid != uuid)
+                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
+                .filter(h -> h.timeStepBorn <= timeStep)
+                .filter(h -> h.remainingConnections >= 0)
+                .filter(h -> h.acquaintances.size() <= h.maxNumAcquaintances)
+                .collect(Collectors.toList());
+
+        for (Household hh : hh1) {
+            // Check if any remaining connections available
+            if (acquaintances.size() == maxNumAcquaintances || remainingConnections <= 0) {
+                return;
+            }
+
+            acquaintances.add(hh);
+            hh.acquaintances.add(this);
+
+//            String msg = String.format("%1$s related %2$s as acquaintences", vertexName, hh.vertexName);
+//            System.out.println(msg);
+        }
+    }
+
+	public void assignFamilyToAgentAtTimeStep(double timeStep) {
+        if (respectedFamilyMembers.size() == maxNumFamilyMembers || remainingConnections <= 0) {
+            return;
+        }
+
 		List<Household> houseHoldAgentsShuffled = new ArrayList<Household>(houseHoldAgents);
 		// Shuffle this list (friends assigned to random agents)
 		Collections.shuffle(houseHoldAgentsShuffled);
-		for (Household hhFriend : houseHoldAgentsShuffled) {
-			// Do not match if friend does not yet exist in this time step
-			if (hhFriend.timeStepBorn > timeStep){
-				continue;
-			}
-			// Check if agent has reached maximum amount of friends - exit function
-			if (acquaintances.size() == maxNumAcquaintances) {
-				return;
-			}
-			// Do not match agent to itself - loop to next agent
-			// Do not match agent to a friend that has max amount of friends already - loop to next agent
-			if (this.uuid == hhFriend.uuid || hhFriend.acquaintances.size() == hhFriend.maxNumAcquaintances) {
-				continue;
-			}
-			//If agent is already a friend or family member, do not add to network again - loop to next agent
-			if (doesAcquaintanceshipExist(hhFriend.uuid) == true || doesFamilyRelationshipExist(hhFriend.uuid) == true) {
-				continue;
-			}
-			if (doesCloseFriendshipExist(hhFriend.uuid) == true){
-				continue;
-			}
-			// Get random integer between 1 and 100. If less than or equal to friendship probability, add each friend to each other's friends arraylist
-			if (rng.nextInt(100) <= PROBABILITY_OF_FRIENDSHIP) {
-				acquaintances.add(hhFriend);
-				hhFriend.acquaintances.add(this);
-			}
+
+        List<Household> hh1 = houseHoldAgents.stream()
+                .filter(h -> h.uuid != uuid)
+                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
+                .filter(h -> h.timeStepBorn <= timeStep)
+                .filter(h -> h.remainingConnections >= 0)
+                .filter(h -> h.acquaintances.size() <= h.maxNumAcquaintances)
+                .collect(Collectors.toList());
+
+		for (Household hh : hh1) {
+            // Check if any remaining connections available
+            if (respectedFamilyMembers.size() == maxNumFamilyMembers || remainingConnections <= 0) {
+                return;
+            }
+
+            respectedFamilyMembers.add(hh);
+            hh.acquaintances.add(this);
+
+//            String msg = String.format("%1$s added %2$s as family (%2$s recognizes as acquaintenance)", vertexName, hh.vertexName);
+//            System.out.println(msg);
 		}
 	}
 
-	public void assignFamilyToAgentAtTimeStep(double timeStep){
-		if (respectedFamilyMembers.size() == maxNumFamilyMembers) {
-			return;
-		}
-		List<Household> houseHoldAgentsShuffled = new ArrayList<Household>(houseHoldAgents);
-		// Shuffle this list (friends assigned to random agents)
-		Collections.shuffle(houseHoldAgentsShuffled);
-		for (Household hhFam : houseHoldAgentsShuffled) {
-			// Do not match if agent does not yet exist in this time step
-			if (hhFam.timeStepBorn > timeStep){
-				continue;
-			}
-			if (respectedFamilyMembers.size() == maxNumFamilyMembers) {
-				return;
-			}
-			// Do not match agent to itself - loop to next agent
-			// Do not match agent to a friend that has max amount of acquaintances already - loop to next agent
-			if (this.uuid == hhFam.uuid || hhFam.acquaintances.size() == hhFam.maxNumAcquaintances) {
-				continue;
-			}
-			//If agent is already an acquaintance or family member, do not add to network again - loop to next agent
-			if (doesAcquaintanceshipExist(hhFam.uuid) == true || doesFamilyRelationshipExist(hhFam.uuid) == true) {
-				continue;
-			}
-			//If agent already is a close friend, loop to next agent
-			if (doesCloseFriendshipExist(hhFam.uuid) == true){
-				continue;
-			}
+    public void assignCloseFriendsAtTimeStep(double timeStep) {
+        if (closeFriends.size() == maxNumCloseFriends || remainingConnections <= 0) {
+            return;
+        }
 
-			// Get random integer between 1 and 100. If less than or equal to friendship probability, add each friend to each other's friends arraylist
-			if (rng.nextInt(100) <= PROBABILITY_OF_FRIENDSHIP) {
-				respectedFamilyMembers.add(hhFam);
-				hhFam.acquaintances.add(this);
-			}
-		}
-	}
+        List<Household> houseHoldAgentsShuffled = new ArrayList<Household>(houseHoldAgents);
+        // Shuffle this list (friends assigned to random agents)
+        Collections.shuffle(houseHoldAgentsShuffled);
 
-	public void assignCloseFriendsAtTimeStep(double timeStep){
-		if (closeFriends.size() == maxNumCloseFriends) {
-			return;
-		}
-		List<Household> houseHoldAgentsShuffled = new ArrayList<Household>(houseHoldAgents);
-		// Shuffle this list (friends assigned to random agents)
-		Collections.shuffle(houseHoldAgentsShuffled);
-		for (Household hhFriend : houseHoldAgentsShuffled) {
-			// Do not match if agent does not yet exist in this time step
-			if (hhFriend.timeStepBorn > timeStep){
-				continue;
-			}
-			if (closeFriends.size() == maxNumCloseFriends) {
-				return;
-			}
-			// Do not match agent to itself - loop to next agent
-			// Do not match agent to a friend that has max amount of fam members already - loop to next agent
-			if (this.uuid == hhFriend.uuid || hhFriend.respectedFamilyMembers.size() == hhFriend.maxNumFamilyMembers) {
-				continue;
-			}
-			//If agent is already an acquaintance or family member, do not add to network again - loop to next agent
-			if (doesAcquaintanceshipExist(hhFriend.uuid) == true || doesFamilyRelationshipExist(hhFriend.uuid) == true) {
-				continue;
-			}
-			if (doesCloseFriendshipExist(hhFriend.uuid) == true){
-				continue;
-			}
-			// Get random integer between 1 and 100. If less than or equal to friendship probability, add each friend to each other's friends arraylist
-			if (rng.nextInt(100) <= PROBABILITY_OF_FRIENDSHIP) {
-				closeFriends.add(hhFriend);
-				hhFriend.closeFriends.add(this);
-			}
-		}
-	}
+        List<Household> hh1 = houseHoldAgents.stream()
+                .filter(h -> h.uuid != uuid)
+                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
+                .filter(h -> h.timeStepBorn <= timeStep)
+                .filter(h -> h.remainingConnections >= 0)
+                .filter(h -> h.closeFriends.size() <= h.maxNumCloseFriends)
+                .collect(Collectors.toList());
+
+        for (Household hh : hh1) {
+            // Check if any remaining connections available
+            if (closeFriends.size() == maxNumCloseFriends || remainingConnections <= 0) {
+                return;
+            }
+
+            closeFriends.add(hh);
+            hh.closeFriends.add(this);
+
+//            String msg = String.format("%1$s related %2$s as friends", vertexName, hh.vertexName);
+//            System.out.println(msg);
+        }
+    }
+
+	protected boolean doesRelationshipAlreadyExist(UUID targetUuid){
+        List<Household> relatedHouseholds = new ArrayList<Household>();
+        relatedHouseholds.addAll(respectedFamilyMembers);
+        relatedHouseholds.addAll(closeFriends);
+        relatedHouseholds.addAll(acquaintances);
+
+        for (Household hh : relatedHouseholds){
+            if (targetUuid == hh.uuid){
+                return true;
+            }
+        }
+        return false;
+    }
 
 	protected boolean doesAcquaintanceshipExist(UUID friendUUID) {
 		for (Household currentFriend : acquaintances) {
