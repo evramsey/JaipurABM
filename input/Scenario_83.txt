@@ -1,0 +1,42 @@
+Model Initialization Parameters 
+
+Number of jobs: 		
+1
+Number of steps in main (2*(1 + number of dates to allow data collector to run—should be 458 for real run, 12 for test):	
+458
+Average household size:	
+5.1
+
+Social network setup (string): 
+original
+
+OutputFileName (string):
+/Users/lizramsey/Documents/workspace/JaipurABM/GeneratedTXTs/Scenario83.txt
+
+Agent Initialization Parameters
+
+Percent initial conservers:	
+0.05
+
+Utility Function Parameters
+
+a/b prime value:
+0.7
+a prime/b value:
+0.3
+exogenous term:
+0.05
+beta (1 means util function completely determines action, 0 means completely random):
+0.5
+delta
+0.05
+skip steps in utility calculation:
+60
+skip steps in talk function:
+6
+
+
+For original network—
+k:
+p: (or something like that, look this up)
+

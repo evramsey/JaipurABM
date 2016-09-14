@@ -2,6 +2,7 @@
 
 import java.io.*;
 import java.util.*;
+import java.text.SimpleDateFormat;
 
 import org.apache.commons.collections15.Factory;
 import org.graphstream.algorithm.generator.Generator;
@@ -14,6 +15,7 @@ import org.graphstream.graph.implementations.SingleGraph;
 
 import sim.engine.*;
 import ec.util.MersenneTwisterFast;
+
 
 /**
  *
@@ -38,6 +40,8 @@ public class JaipurABM extends SimState{
 	public static String outputFileName;
 	public static String dataSourceFile ="/Users/lizramsey/Documents/workspace/JaipurABM/src/Initialization_Parameters.txt";
 	public static int numStepsSkippedToUpdateFunctions;
+	public static int numStepsSkippedToUpdateUtilityFunctions;
+	public static int numStepsSkippedToUpdateTalkFunction;
 	
 	public static int numTotalAgents = 0;
 	public static String txtFileInput;
@@ -59,9 +63,47 @@ public class JaipurABM extends SimState{
 	}
 
 	public static void main(String[] args) {
+
+		Date date = new Date();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+		String formattedDate = sdf.format(date);
+
+		DataCollector.time_simulation_start = formattedDate;
+
+		File[] files = new File("./input").listFiles();
+		//If this pathname does not denote a directory, then listFiles() returns null.
+
+		for (File file : files) {
+			if (file.isFile()) {
+				DataCollector.in_filename = file.getName();
+				runSimulation(file.getAbsolutePath());
+			}
+		}
+
+		try {
+			DataCollector.aggregateResults();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+//		txtFileInput = txtFileInput + DataCollector.txtFileInput;
+//		generateTxtFile(txtFileInput);
+		System.out.println("all runs finished, exiting");
+		System.exit(0);
+	}
+
+	public static void runSimulation()
+	{
+		runSimulation(dataSourceFile);
+	}
+
+	public static void runSimulation(String input_file){
 		SimState state = new JaipurABM(System.currentTimeMillis());
-		scanInputCSV.readInData(dataSourceFile);
-		System.out.println("num skipped steps " + numStepsSkippedToUpdateFunctions);
+		scanInputCSV.readInData(input_file);
+		System.out.println("num skipped steps " + numStepsSkippedToUpdateUtilityFunctions);
+
+		currentJob = 0;
+
 		for(int job = 0; job < jobs; job++){
 			initialize_agents();
 
@@ -71,10 +113,10 @@ public class JaipurABM extends SimState{
 			currentJob++;
 			state.start();
 			txtFileInput = "Utility Function Values\ta value\t" + UtilityFunction.a + "\ta prime value\t" + UtilityFunction.aPrime +
-					"\tb value\t" + UtilityFunction.b + "\tb prime value\t" + UtilityFunction.bPrime + "\texogenous term\t" + 
-					UtilityFunction.exogenousTerm + "\tbeta\t" + ProbabilityOfBehavior.beta + "\tdelta\t" + 
-					UtilityFunction.parameterDelta + "\tNum skipped steps to update utility\t" + numStepsSkippedToUpdateFunctions + 
-					"\n\n";
+					"\tb value\t" + UtilityFunction.b + "\tb prime value\t" + UtilityFunction.bPrime + "\texogenous term\t" +
+					UtilityFunction.exogenousTerm + "\tbeta\t" + ProbabilityOfBehavior.beta + "\tdelta\t" +
+					UtilityFunction.parameterDelta + "\tNum skipped steps to update utility\t" + numStepsSkippedToUpdateUtilityFunctions +
+					"\tnum skipped steps to update talk function\t" + numStepsSkippedToUpdateTalkFunction+"\n\n";
 			txtFileInput =  txtFileInput + "Job Number\tTime Step\tModel Population\t# of Agents\t# of Conservers\tRatio of Conservers to Total Agents\tTotal Demand\n";		//create .txt file for outputting results
 			do
 				if (!state.schedule.step(state)) {
@@ -83,10 +125,6 @@ public class JaipurABM extends SimState{
 			while(state.schedule.getSteps() < numStepsInMain);
 			state.finish();
 		}
-		txtFileInput = txtFileInput + DataCollector.txtFileInput;
-		generateTxtFile(txtFileInput);
-		System.out.println("all runs finished, exiting");
-		System.exit(0);
 	}
 
 	public static void initialize_agents(){

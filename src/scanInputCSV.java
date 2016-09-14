@@ -9,7 +9,7 @@ public class scanInputCSV{
 	public static int[][] popScan(String dataSourceFile) {
 		File fileName = new File(dataSourceFile);
 		if (!fileName.exists()){
-			System.out.println("no file found, better luck next time!");
+			System.out.println("ScanInputCSV file not found, better luck next time!");
 			System.exit(1);
 		}
 
@@ -85,7 +85,7 @@ public class scanInputCSV{
 	public static void readInData(String dataSourceFile){
 		File fileName = new File(dataSourceFile);
 		if (!fileName.exists()){
-			System.out.println("no file found, better luck next time!");
+			System.out.println("DataSourceFile file not found, better luck next time!");
 			System.exit(1);
 		}
 		Scanner lineCountScanner;
@@ -250,8 +250,19 @@ public class scanInputCSV{
 		}
 
 		if (fileScanner.hasNextInt()){
-			JaipurABM.numStepsSkippedToUpdateFunctions = fileScanner.nextInt();
-			
+			JaipurABM.numStepsSkippedToUpdateUtilityFunctions = fileScanner.nextInt();
+
+		}
+		if (fileScanner.hasNextLine()){
+			fileScanner.nextLine();
+		}
+		if (fileScanner.hasNextLine()){
+			fileScanner.nextLine();
+		}
+		if (fileScanner.hasNextInt()){
+			System.out.println("talk function skip updated");
+			JaipurABM.numStepsSkippedToUpdateTalkFunction = fileScanner.nextInt();
 		}
 	}
 }
+
