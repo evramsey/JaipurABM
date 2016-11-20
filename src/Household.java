@@ -113,8 +113,6 @@ public class Household implements Steppable {
             System.out.println("Household has more connections (" + nExistingConnections
                     + ") than maximum allowed connections (" + maxNumConnections + ")");
         }
-//		else{
-//		}
     }
 
 
@@ -226,15 +224,12 @@ public class Household implements Steppable {
 		int friendDelta = calculateDelta(this.independentLikelihoodDFInstall, this.friendLikelihoodDFInstall);
 		if(isConserver){
 			double randNum = rng.nextDouble(true, true);
-			System.out.println(this.vertexName + " is a conserver;");
-			System.out.println("fam ratio: " + RatioFamConservers + " friend ratio: " + RatioFriendConservers + "acq ratio: " + RatioAcqConservers);
 			double utilStay = UtilityFunction.calculateUtilityForConserverStayingConserver(RatioFamConservers,
 					famDelta, RatioFriendConservers, friendDelta, RatioAcqConservers);
 			double utilChange = UtilityFunction.calculateUtilityForConserverBecomingNonConserver(RatioFamNonConservers,
 					famDelta, RatioFriendNonConservers, friendDelta, RatioAcqNonConservers);	
 		//	System.out.println("utility of staying conserver: " + utilStay + " utility of becoming nonconserver: " + utilChange);
 			double probabilityConsToCons = ProbabilityOfBehavior.probabilityConsToCons(utilStay, utilChange);
-			System.out.println("randnum: " + randNum);
 			if (randNum > probabilityConsToCons){
 				isConserver = false;
 				System.out.println(vertexName + " is changing from conserver to nonconserver");
@@ -243,8 +238,6 @@ public class Household implements Steppable {
 //				isConserver = false;
 //			}
 		} else {
-			System.out.println(this.vertexName + " is a non-conserver;");
-			System.out.println("fam ratio: " + RatioFamNonConservers + " friend ratio: " + RatioFriendNonConservers + "acq ratio: " + RatioAcqNonConservers);
 			double randNum = rng.nextDouble(true, true);
 			double utilStay = UtilityFunction.calculateUtilityForNonConserverStayingNonConserver(RatioFamNonConservers,
 					famDelta, RatioFriendNonConservers, friendDelta, RatioAcqNonConservers);
@@ -252,10 +245,9 @@ public class Household implements Steppable {
 					famDelta, RatioFriendConservers, friendDelta, RatioAcqConservers);
 		//	System.out.println("utility of staying nonconserver: " + utilStay + " utility of becoming conserver: " + utilChange);
 			double probabilityNonConsToNonCons = ProbabilityOfBehavior.probabilityNonConsToNonCons(utilChange, utilStay);
-			System.out.print("randnum: " + randNum);
 			if (randNum > probabilityNonConsToNonCons){
 				isConserver = true;
-				System.out.println(vertexName + " is changing from nonconserver to conserver");
+				//System.out.println(vertexName + " is changing from nonconserver to conserver");
 			}
 //			if (utilChange > utilStay){
 //				isConserver = true;
@@ -291,24 +283,6 @@ public class Household implements Steppable {
             assignFamilyToAgentAtTimeStep(timeStep);
             assignCloseFriendsAtTimeStep(timeStep);
             assignAcquaintancesToAgentAtTimeStep(timeStep);
-
-//			ArrayList<String> names = new ArrayList<String>();
-//
-//			for(Household hh: this.respectedFamilyMembers){
-//				names.add(hh.vertexName);
-//			}
-//			for(Household hh: this.closeFriends){
-//				names.add(hh.vertexName);
-//			}
-//			for(Household hh: this.acquaintances){
-//				names.add(hh.vertexName);
-//			}
-//
-//			Set<String> uniqueNames = new HashSet<String>(names);
-//
-//			if(names.size() != uniqueNames.size()){
-//    			int i = 1;
-//			}
         }
     }
 
@@ -376,9 +350,6 @@ public class Household implements Steppable {
 
 			this.remainingConnections--;
 			hh.remainingConnections--;
-
-//            String msg = String.format("%1$s added %2$s as family (%2$s recognizes as acquaintenance)", vertexName, hh.vertexName);
-//            System.out.println(msg);
 		}
 	}
 
@@ -418,38 +389,7 @@ public class Household implements Steppable {
     }
 
 	protected boolean doesRelationshipAlreadyExist(UUID targetUuid){
-//        List<Household> relatedHouseholds = new ArrayList<Household>();
-//        relatedHouseholds.addAll(respectedFamilyMembers);
-//        relatedHouseholds.addAll(closeFriends);
-//        relatedHouseholds.addAll(acquaintances);
-		boolean found = relatedUuids.contains(targetUuid);
-		return found;
-
-//		boolean found = respectedFamilyMembers.stream().filter(h -> h.getUUID().equals(targetUuid)).findFirst().isPresent();
-//		if (found) {return true;}
-//		found = closeFriends.stream().filter(h -> h.getUUID().equals(targetUuid)).findFirst().isPresent();
-//		if (found) {return true;}
-//		found = acquaintances.stream().filter(h -> h.getUUID().equals(targetUuid)).findFirst().isPresent();
-//		if (found) {return true;}
-//		return false;
-
-
-//        for (Household hh : respectedFamilyMembers){
-//            if (targetUuid == hh.uuid){
-//                return true;
-//            }
-//        }
-//        for (Household hh : closeFriends){
-//			if (targetUuid == hh.uuid){
-//				return true;
-//			}
-//		}
-//		for (Household hh : acquaintances){
-//			if (targetUuid == hh.uuid){
-//				return true;
-//			}
-//		}
-//        return false;
+		return relatedUuids.contains(targetUuid);
     }
 
 	public void talk(ArrayList<Household> wholeNetwork, ArrayList<Household> networkTalkedToAlready, SimState state){
@@ -578,7 +518,6 @@ public class Household implements Steppable {
 		acqAlreadySpokenTo.clear();
 		friendsAlreadySpokenTo.clear();
 		famAlreadySpokenTo.clear();
-
 	}
 	
 	public void testingForJobError(){

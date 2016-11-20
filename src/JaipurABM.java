@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 import java.text.SimpleDateFormat;
 
+import com.opencsv.CSVReader;
 import org.apache.commons.collections15.Factory;
 import org.graphstream.algorithm.generator.Generator;
 import org.graphstream.algorithm.generator.GridGenerator;
@@ -62,35 +63,149 @@ public class JaipurABM extends SimState{
 		super(seed);
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 
+//		double test = run(0.9, 0.9, 0.3, 0.6, 60, 6);
+
+		//GenerateInputFilesFromRanges();
 		Date date = new Date();
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
 		String formattedDate = sdf.format(date);
 
 		DataCollector.time_simulation_start = formattedDate;
 
-		File[] files = new File("./input").listFiles();
-		//If this pathname does not denote a directory, then listFiles() returns null.
+		String out_filename = "./output/" + formattedDate + "/r2_output.csv";
+		CSVReader reader = new CSVReader(new FileReader(out_filename));
+		List<String[]> lines = reader.readAll();
+		reader.close();
 
-		for (File file : files) {
-			if (file.isFile()) {
-				DataCollector.in_filename = file.getName();
-				runSimulation(file.getAbsolutePath());
-			}
-		}
+		String[] last_row = lines.get(lines.size() - 1);
 
-		try {
-			DataCollector.aggregateResults();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		double A = Double.parseDouble(last_row[4]);
+		double B = Double.parseDouble(last_row[6]);
+		double beta = Double.parseDouble(last_row[9]);
+		double delta = Double.parseDouble(last_row[10]);
+		int utility_steps = Integer.parseInt(last_row[11]);
+		int talk_steps = 6;
 
-//		txtFileInput = txtFileInput + DataCollector.txtFileInput;
-//		generateTxtFile(txtFileInput);
+		String in_file_name = "autogen.txt";
+		String output_file = String.format(in_file_name);
+		GenerateInputFile(output_file, A, B, delta, beta, utility_steps, talk_steps);
+		DataCollector.in_filename = in_file_name;
+		runSimulation(in_file_name);
+		DataCollector.calculateR2();
+
 		System.out.println("all runs finished, exiting");
 		System.exit(0);
 	}
+
+	public static double run(double A, double B, double beta, double delta, int utility_steps, int talk_steps) throws IOException{
+		//GenerateInputFilesFromRanges();
+		Date date = new Date();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+		String formattedDate = sdf.format(date);
+
+		DataCollector.time_simulation_start = "results"; //formattedDate;
+
+//		String out_filename = "./output/" + formattedDate + "/r2_output.csv";
+//		CSVReader reader = new CSVReader(new FileReader(out_filename));
+//		List<String[]> lines = reader.readAll();
+//		reader.close();
+//
+//		String[] last_row = lines.get(lines.size() - 1);
+
+		String in_file_name = "autogen.txt";
+
+		String output_file = String.format(in_file_name);
+
+		GenerateInputFile(output_file, A, B, delta, beta, utility_steps, talk_steps);
+		DataCollector.in_filename = in_file_name;
+		runSimulation(in_file_name);
+		double r2 = DataCollector.calculateR2();
+
+		return r2;
+	}
+
+//	public static void main(String[] args) throws IOException {
+//
+//		//GenerateInputFilesFromRanges();
+//		Date date = new Date();
+//		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+//		String formattedDate = sdf.format(date);
+//
+//		formattedDate = "20160916075227";
+//
+//		DataCollector.time_simulation_start = formattedDate;
+//
+//		boolean set_vals = true;
+//		int gen_ctr = 1;
+//		for (double A = 0.1; A <= 1.001; A+=0.05) {
+//			for (double B = 0.1; B <= 1.001; B+=0.05) {
+//				for (double delta = 0.0; delta <= 0.301; delta+=0.1) {
+//					for (double beta = 0; beta <= 1.001; beta+=0.1) {
+//						for (int utility_steps = 6; utility_steps <= 60; utility_steps+=6) {
+//							for (int talk_steps = 6; talk_steps <= 6; talk_steps+=6) {
+//
+//								if (set_vals){
+//									String out_filename = "./output/" + formattedDate + "/r2_output.csv";
+//									CSVReader reader = new CSVReader(new FileReader(out_filename));
+//									List<String[]> lines = reader.readAll();
+//									reader.close();
+//
+//									String[] last_row = lines.get(lines.size() - 1);
+//
+//									set_vals = false;
+//									A = Double.parseDouble(last_row[4]);
+//									B = Double.parseDouble(last_row[6]);
+//									beta = Double.parseDouble(last_row[9]);
+//									delta = Double.parseDouble(last_row[10]);
+//									utility_steps = Integer.parseInt(last_row[11]);
+//									talk_steps = 6;
+//									continue;
+//								}
+//
+//								if (A <= B){
+//									continue;
+//								}
+//
+//								String in_file_name = "autogen.txt";
+//								String output_file = String.format(in_file_name, gen_ctr);
+//								GenerateInputFile(output_file, A, B, delta, beta, utility_steps, talk_steps);
+//								DataCollector.in_filename = in_file_name;
+//								runSimulation(in_file_name);
+//								DataCollector.calculateR2();
+//								gen_ctr++;
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+
+//		File[] files = new File("./input").listFiles();
+//		//If this pathname does not denote a directory, then listFiles() returns null.
+//
+//		for (File file : files) {
+//			if (file.isFile() && file.getName().endsWith(".txt")) {
+//				DataCollector.in_filename = file.getName();
+//				runSimulation(file.getAbsolutePath());
+//				//DataCollector.writeGexf();
+//				int i = 1;
+//				//DataCollector.writeJsonData();
+//			}
+//		}
+//
+//		try {
+//			DataCollector.aggregateResults();
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+
+//		txtFileInput = txtFileInput + DataCollector.txtFileInput;
+//		generateTxtFile(txtFileInput);
+//		System.out.println("all runs finished, exiting");
+//		System.exit(0);
+//	}
 
 	public static void runSimulation()
 	{
@@ -112,12 +227,6 @@ public class JaipurABM extends SimState{
 			state.setJob(job);
 			currentJob++;
 			state.start();
-			txtFileInput = "Utility Function Values\ta value\t" + UtilityFunction.a + "\ta prime value\t" + UtilityFunction.aPrime +
-					"\tb value\t" + UtilityFunction.b + "\tb prime value\t" + UtilityFunction.bPrime + "\texogenous term\t" +
-					UtilityFunction.exogenousTerm + "\tbeta\t" + ProbabilityOfBehavior.beta + "\tdelta\t" +
-					UtilityFunction.parameterDelta + "\tNum skipped steps to update utility\t" + numStepsSkippedToUpdateUtilityFunctions +
-					"\tnum skipped steps to update talk function\t" + numStepsSkippedToUpdateTalkFunction+"\n\n";
-			txtFileInput =  txtFileInput + "Job Number\tTime Step\tModel Population\t# of Agents\t# of Conservers\tRatio of Conservers to Total Agents\tTotal Demand\n";		//create .txt file for outputting results
 			do
 				if (!state.schedule.step(state)) {
 					break;
@@ -342,6 +451,78 @@ public class JaipurABM extends SimState{
 		}
 		System.out.println("findHouseholdFromUUID isn't working");
 		return null;
+	}
+	private static void GenerateInputFilesFromRanges(){
+		int talk_steps = 1;
+		int gen_ctr = 1;
+		for (double A = 1.0; A <= 10.0; A+=0.5) {
+			for (double B = 1.0; B <= 10.0; B+=0.5) {
+				for (double delta = 0.0; delta <= 0.3; delta+=0.1) {
+					for (double beta = 0; beta <= 1.0; beta+=0.1) {
+						for (int utility_steps = 6; utility_steps <= 60; utility_steps+=6) {
+							for (talk_steps = 6; talk_steps <= 60; talk_steps+=6) {
+								String output_file = String.format("./input/autogen_%s.txt", gen_ctr);
+								GenerateInputFile(output_file, A, B, delta, beta, utility_steps, talk_steps);
+								gen_ctr++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	private static void GenerateInputFile(String output_file_name, double A, double B, double delta, double beta, int utility_steps, int talk_steps){
+		String s = new StringBuilder()
+				.append("Model Initialization Parameters\n")
+				.append("\n")
+				.append("Number of jobs:\n")
+				.append("1\n")
+				.append("Number of steps in main (2*(1 + number of dates to allow data collector to run—should be 458 for real run, 12 for test):\n")
+				.append("458\n")
+				.append("Average household size:\n")
+				.append("5.1\n")
+				.append("\n")
+				.append("Social network setup (string):\n")
+				.append("original\n")
+				.append("\n")
+				.append("OutputFileName (string):\n")
+				.append("/Users/lizramsey/Documents/workspace/JaipurABM/GeneratedTXTs/Scenario19_0.05IC_a0.7_b0.3_et0_beta1_delta0_utilskip48_talkskip6.txt\n")
+				.append("\n")
+				.append("Agent Initialization Parameters\n")
+				.append("\n")
+				.append("Percent initial conservers:\n")
+				.append("0.05\n")
+				.append("\n")
+				.append("Utility Function Parameters\n")
+				.append("\n")
+				.append("a/b prime value:\n")
+				.append(A + "\n")
+				.append("a prime/b value:\n")
+				.append(B + "\n")
+				.append("exogenous term:\n")
+				.append("0\n")
+				.append("beta (1 means util function completely determines action, 0 means completely random):\n")
+				.append(beta + "\n")
+				.append("delta\n")
+				.append(delta + "\n")
+				.append("skip steps in utility calculation:\n")
+				.append(utility_steps + "\n")
+				.append("skip steps in talk function:\n")
+				.append(talk_steps + "\n")
+				.append("\n")
+				.append("\n")
+				.append("For original network—\n")
+				.append("k:\n")
+				.append("p: (or something like that, look this up)\n")
+				.toString();
+		try {
+			BufferedWriter writer = new BufferedWriter(new FileWriter(output_file_name));
+			writer.write(s);
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
 	}
 
 }
