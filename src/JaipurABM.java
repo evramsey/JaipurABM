@@ -99,6 +99,18 @@ public class JaipurABM extends SimState{
 		System.exit(0);
 	}
 
+	public static double run_jobs(double A, double B, double beta, double delta, int utility_steps, int talk_steps, int n_jobs,
+								  String population_file, String output_dir) throws IOException{
+
+		populationCSVfile = population_file;
+
+		double avgR2 = 0;
+		for(int i = 0; i < n_jobs; i++){
+			avgR2 += run(A, B, beta, delta, utility_steps, talk_steps);
+		}
+		return avgR2/n_jobs;
+
+	}
 	public static double run(double A, double B, double beta, double delta, int utility_steps, int talk_steps) throws IOException{
 		//GenerateInputFilesFromRanges();
 		Date date = new Date();
