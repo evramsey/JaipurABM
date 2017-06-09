@@ -10,7 +10,7 @@ import org.graphstream.graph.implementations.SingleGraph;
 import sim.engine.SimState;
 
 import java.io.*;
-import java.text.SimpleDateFormat;
+//import java.text.SimpleDateFormat;
 import java.util.*;
 
 
@@ -29,14 +29,18 @@ public class JaipurABM extends SimState{
 	public static String graphStructure;
 	public static int jobs;
 	public static String resultsFileName;
+	public static double modelTimeStep;
+
+	public static double socialPressureAverage;
+	public static double stdDevPressureDelta;
 
 	public static int numRuns = 1;
 
 	public static int numStepsInMain;
 	public static double averageHouseholdSize = 5.1;
-	public static String populationCSVfile = "/Users/lizramsey/Documents/AgentPopulation.csv";
+	public static String populationCSVfile;
 	public static String outputFileName;
-	public static String dataSourceFile ="/Users/lizramsey/Documents/workspace/JaipurABM/src/Initialization_Parameters.txt";
+	public static String dataSourceFile;
 	public static int numStepsSkippedToUpdateFunctions;
 	//no longer programmed by ABM, so moved to Household level
 	//public static int numStepsSkippedToUpdateUtilityFunctions;
@@ -92,21 +96,23 @@ public class JaipurABM extends SimState{
 //		System.exit(0);
 //	}
 
-	public static double run_jobs(double A, double B, double beta, double delta, int n_jobs,
+	public static double run_jobs(double A, double B, double beta, double delta, double stdDevDelta, int n_jobs,
 								  String population_file, String outputFileName) throws IOException{
 		resultsFileName = outputFileName;
 		populationCSVfile = population_file;
+		socialPressureAverage = delta;
+		stdDevPressureDelta = stdDevDelta;
 		int thisJob = 0;
 		double avgR2 = 0;
 		for(int i = 0; i < n_jobs; i++){
 			System.out.println("this job number: " + thisJob);
-			avgR2 += run(A, B, beta, delta);
+			avgR2 += run(A, B, beta, socialPressureAverage, stdDevPressureDelta);
 			thisJob++;
 		}
 		return avgR2/n_jobs;
 
 	}
-	public static double run(double A, double B, double beta, double delta) throws IOException{
+	public static double run(double A, double B, double beta, double delta, double stdDevDelta) throws IOException{
 		//Date date = new Date();
 		//SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
 		//String stringDate = sdf.format(date);
@@ -210,7 +216,13 @@ public class JaipurABM extends SimState{
 		}
 	}
 
-	protected int getNumNewAgents(int[][] population, double timeStep){
+	public static int getNumNewAgents(double timeStep){
+		int[][] populationArray = scanInputCSV.popScan(populationCSVfile);
+		int numAgents = getNumNewAgents(populationArray, timeStep);
+		return numAgents;
+	}
+
+	private static int getNumNewAgents(int[][] population, double timeStep){
 		int intTimeStep = (int) timeStep;
 		int popPreviousTimeStep;
 		int numNewHouseholds;
@@ -357,6 +369,7 @@ public class JaipurABM extends SimState{
 				.append("1\n")
 				.append("Number of steps in main (2*(1 + number of dates to allow data collector to run—should be 458 for real run, 12 for test):\n")
 				.append("458\n")
+				//.append("10\n")
 				.append("Average household size:\n")
 				.append("5.1\n")
 				.append("\n")
@@ -368,8 +381,9 @@ public class JaipurABM extends SimState{
 				.append("\n")
 				.append("Agent Initialization Parameters\n")
 				.append("\n")
-				.append("Percent initial conservers:\n")
+				.append("Ratio initial conservers:\n")
 				.append("0.005\n")
+				//.append("0.5\n")
 				.append("\n")
 				.append("Utility Function Parameters\n")
 				.append("\n")

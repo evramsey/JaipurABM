@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +29,7 @@ public class DataCollector implements Steppable{
 	public static String in_filename;
 	public static String time_simulation_start;
 
+	public static int numAgentsThisTimeStep = 0;
 	public static int numR2calcs = 1;
 
 	public static String out_filename;
@@ -48,8 +50,6 @@ public class DataCollector implements Steppable{
 	public DataCollector(){}
 
 	public void step(SimState state) {
-		JaipurABM jaipurWaterUse = (JaipurABM) state;
-
 		int i = in_filename.contains(".") ? in_filename.lastIndexOf('.') : in_filename.length();
 		String output_file_name = "./output/" + time_simulation_start + "/" + in_filename.substring(0, i) + "_output.csv";
 
@@ -57,10 +57,8 @@ public class DataCollector implements Steppable{
 
         CSVWriter writer = null;
         try {
-
 			final File file = new File(output_file_name);
 			final File parent_directory = file.getParentFile();
-
 			if (null != parent_directory)
 			{
 				parent_directory.mkdirs();
@@ -74,7 +72,6 @@ public class DataCollector implements Steppable{
 			entries.add(time_simulation_start);
 			headers.add("In_Filename");
 			entries.add(in_filename);
-
 			headers.add("Job");
 			entries.add(String.valueOf(JaipurABM.getCurrentJob()));
 			headers.add("Timestep");
@@ -89,7 +86,6 @@ public class DataCollector implements Steppable{
 			entries.add(String.valueOf(ratio));
 			headers.add("Cumulative_Demand");
 			entries.add(String.valueOf(CumulativeDemand));
-
 			headers.add("A");
 			entries.add(String.valueOf(UtilityFunction.a));
 			headers.add("A_Prime");
@@ -104,14 +100,6 @@ public class DataCollector implements Steppable{
 			entries.add(String.valueOf(ProbabilityOfBehavior.beta));
 			headers.add("Delta");
 			entries.add(String.valueOf(UtilityFunction.parameterDelta));
-			//headers.add("Skipped_Steps_Utility");
-			//entries.add(String.valueOf(JaipurABM.numStepsSkippedToUpdateUtilityFunctions));
-			//headers.add("Skipped_Steps_Talk");
-			//entries.add(String.valueOf(JaipurABM.numStepsSkippedToUpdateTalkFunction));
-
-//            // feed in your array (or convert your data to an array)
-//            String entryString = JaipurABM.JaipurABM.getCurrentJob() + "\t" + state.schedule.getTime() + "\t" +
-//                    modelPopulation + "\t" + numAgents + "\t" + numConservers + "\t" + ratio +"\t"+ CumulativeDemand;
 
 			String[] headerArray = headers.toArray(new String[0]);
 			String[] entryArray = entries.toArray(new String[0]);
@@ -130,16 +118,11 @@ public class DataCollector implements Steppable{
         } catch (IOException e) {
             writer = null;
         }
-
+		generateAgentOutput("AgentOutputs_GAParameterSet10.csv", state);
         numAgents = 0;
 		CumulativeDemand = 0.0;
 		modelPopulation = 0;
 		numConservers = 0;
-		ratio = 0;
-	}
-
-	public static void updateTxtFile(String s){
-		txtFileInput = txtFileInput + s;
 	}
 
 	public double getConserverRatioThisTimeStep(){
@@ -147,17 +130,6 @@ public class DataCollector implements Steppable{
 		double numAgentsDub = (double)(numAgents);
 		double ratio = numConserversDub/numAgentsDub;
 		return ratio;
-	}
-
-	public void getDataAtTimeStep(double timeStep){
-		List<Household> nHouseholdsAtTs = Household.houseHoldAgents.stream()
-				.filter(h -> h.timeStepBorn <= timeStep)
-				.collect(Collectors.toList());
-
-//		CumulativeDemand 	= nHouseholdsAtTs.stream().mapToDouble(i -> i.getThisHouseholdDemand()).sum();
-//		modelPopulation 	= nHouseholdsAtTs.stream().mapToInt(i -> i.householdSize).sum();
-//		numAgents 			= nHouseholdsAtTs.size();
-//		numConservers 		= (int) nHouseholdsAtTs.stream().filter(i -> i.isConserver == true).count();
 	}
 
 	public static double[] get_survey_values(){
@@ -188,8 +160,6 @@ public class DataCollector implements Steppable{
 	public static double calculateR2() throws IOException{
 		double[] survey_values = get_survey_values();
 		double[] model_values = new double[20];
-
-
 		int fi = in_filename.contains(".") ? in_filename.lastIndexOf('.') : in_filename.length();
 		String out_filename = "./output/" + time_simulation_start + "/" + in_filename.substring(0, fi) + "_output.csv";
 		//String out_filename = "/Users/evramsey/Documents/workspace/JEC 3/output/" + time_simulation_start + "_r2_output.csv";
@@ -397,4 +367,87 @@ public class DataCollector implements Steppable{
 //		}
 //	}
 
+	public static void generateAgentOutput(String output_file_name, SimState state){
+		numAgentsThisTimeStep = numAgentsThisTimeStep + JaipurABM.getNumNewAgents(state.schedule.getTime());
+		CSVWriter writer = null;
+		try {
+			final File file = new File(output_file_name);
+			final File parent_directory = file.getParentFile();
+			if (null != parent_directory) {
+				parent_directory.mkdirs();
+			}
+
+			writer = new CSVWriter(new FileWriter(output_file_name, true));
+			//ArrayList<String> entries = new ArrayList<>();
+			ArrayList<String> headers = new ArrayList<>();
+
+			headers.add("Current Time Step");
+			headers.add("Agent Name");
+			headers.add("Conservation Status");
+			headers.add("Time Step Born");
+			headers.add("Agent Age");
+			headers.add("NC to WC Conversion");
+			headers.add("WC to NC Conversion");
+			headers.add("Family Size");
+			headers.add("Family Ratio Cons:Network");
+			headers.add("Family Delta");
+			headers.add("Friend Size");
+			headers.add("Friend Ratio Cons:Network");
+			headers.add("Friend Delta");
+			headers.add("Acquaintance Size");
+			headers.add("Acquaintance Ratio Cons:Network");
+
+			String[] headerArray = headers.toArray(new String[0]);
+			if (!file.exists() || file.length() == 0) {
+				writer.writeNext(headerArray);
+			}
+			ArrayList<String[]> networkArrayList = new ArrayList<String[]>();
+			int i = 0;
+			for (Household hh : JaipurABM.network) {
+				if (i < numAgentsThisTimeStep) {
+					String[] hhEntry = new String[15];
+					hhEntry[0] = "" + state.schedule.getTime();
+					hhEntry[1] = hh.getVertexName();
+					hhEntry[2] = String.valueOf(hh.isAgentConserver());
+					hhEntry[3] = String.valueOf(hh.getTimeStepBorn());
+					hhEntry[4] = String.valueOf(hh.getAgentAge(state));
+					hhEntry[5] = String.valueOf(hh.has_converted_NC_to_WC_thistimestep());
+					hhEntry[6] = String.valueOf(hh.has_converted_WC_to_NC_thistimestep());
+					hhEntry[7] = String.valueOf(hh.getFamilySize());
+					hhEntry[8] = String.valueOf(hh.getRatioFamCons());
+					hhEntry[9] = String.valueOf(hh.getFamDelta());
+					hhEntry[10] = String.valueOf(hh.getFriendsSize());
+					hhEntry[11] = String.valueOf(hh.getRatioFriendsCons());
+					hhEntry[12] = String.valueOf(hh.getFriendDelta());
+					hhEntry[13] = String.valueOf(hh.getAcqSize());
+					hhEntry[14] = String.valueOf(hh.getRatioAcqCons());
+
+					networkArrayList.add(hhEntry);
+					i++;
+				}
+				else{
+					break;
+				}
+			}
+			writer.writeAll(networkArrayList);
+
+//			for (Household hh : JaipurABM.network) {
+//				while (j < numAgentsThisTimeStep) {
+//					writer.writeNext(networkArray[j]);
+//					j++;
+//				}
+//				break;
+//			}
+		//		writer.writeNext(networkArray[0]);
+		}catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		try {
+			writer.flush();
+			writer.close();
+		} catch (IOException e) {
+			writer = null;
+		}
+	}
 }

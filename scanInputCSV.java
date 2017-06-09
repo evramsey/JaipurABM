@@ -70,19 +70,6 @@ public class scanInputCSV{
 	}
 
 
-	/**
-	 * Evaluates the existence of a file
-	 * @param filename the name of the file being evaluated
-	 * @return true, if successful
-	 */
-	public static boolean doesFileExist(String filename){
-		File f = new File(filename);
-		if(f.exists()) {
-			return true;
-		}
-		return false;
-	}
-
 	//TODO: complete this guy to read in values from a csv file of initializing data
 	public static void readInData(String dataSourceFile){
 		File fileName = new File(dataSourceFile);
