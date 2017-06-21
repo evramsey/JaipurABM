@@ -105,32 +105,21 @@ public class JaipurABM extends SimState{
 		double avgR2 = 0;
 		for(int i = 0; i < n_jobs; i++){
 			System.out.println("this job number: " + thisJob);
-			avgR2 += run(A, B, beta, socialPressureAverage, thisJob, stdDevPressureDelta);
+			avgR2 += run(A, B, beta, socialPressureAverage, thisJob);
 			thisJob++;
 		}
 		return avgR2/n_jobs;
 
 	}
-	public static double run(double A, double B, double beta, double delta, int jobNum, double stdDevDelta) throws IOException{
+
+	public static double run(double A, double B, double beta, double delta, int jobNum) throws IOException{
+		SimState state = new JaipurABM(System.currentTimeMillis());
 		DataCollector.time_simulation_start = resultsFileName;
 		String in_file_name = "autogen.txt";
 		String output_file = String.format(in_file_name);
 		GenerateInputFile(output_file, A, B, delta, beta);
 		DataCollector.in_filename = in_file_name;
-		runSimulation(in_file_name);
-		double r2 = DataCollector.calculateR2(jobNum);
-		numRuns++;
-		return r2;
-	}
-
-	public static void runSimulation()
-	{
-		runSimulation(dataSourceFile);
-	}
-
-	public static void runSimulation(String input_file){
-		SimState state = new JaipurABM(System.currentTimeMillis());
-		scanInputCSV.readInData(input_file);		//for(int job = 0; job < jobs; job++){
+		scanInputCSV.readInData(in_file_name);
 		state.nameThread();
 		//System.out.println("num skipped steps " + numStepsSkippedToUpdateUtilityFunctions)
 		for(int job = 0; job < 1; job++){
@@ -144,9 +133,12 @@ public class JaipurABM extends SimState{
 				}
 			while(state.schedule.getSteps() < numStepsInMain);
 
-            state.finish();
+			state.finish();
 			state = null;
 		}
+		double r2 = DataCollector.calculateR2(jobNum);
+		numRuns++;
+		return r2;
 	}
 
 	public static void initialize_agents(){
