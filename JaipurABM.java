@@ -1,6 +1,5 @@
 package JaipurABM;
 
-import com.opencsv.CSVReader;
 import org.graphstream.algorithm.generator.Generator;
 import org.graphstream.algorithm.generator.WattsStrogatzGenerator;
 import org.graphstream.graph.Edge;
@@ -9,9 +8,12 @@ import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
 import sim.engine.SimState;
 
-import java.io.*;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.UUID;
 
 
 /**
@@ -27,20 +29,21 @@ public class JaipurABM extends SimState{
 	//"original" is for network broken down by friends, acquaintances, and families, selected randomly
 	//"kleinbergSmallWorldNetwork" is obviously for Kleinberg Small World
 	public static String graphStructure;
+	public static Graph graph;
 	public static int jobs;
 	public static String resultsFileName;
+	public static double modelTimeStep;
+
+	public static double socialPressureAverage;
+	public static double stdDevPressureDelta;
 
 	public static int numRuns = 1;
 
 	public static int numStepsInMain;
 	public static double averageHouseholdSize = 5.1;
-	public static String populationCSVfile = "/Users/lizramsey/Documents/AgentPopulation.csv";
+	public static String populationCSVfile;
 	public static String outputFileName;
-	public static String dataSourceFile ="/Users/lizramsey/Documents/workspace/JaipurABM/src/Initialization_Parameters.txt";
-	public static int numStepsSkippedToUpdateFunctions;
-	//no longer programmed by ABM, so moved to Household level
-	//public static int numStepsSkippedToUpdateUtilityFunctions;
-	//public static int numStepsSkippedToUpdateTalkFunction;
+	public static String dataSourceFile;
 	
 	public static int numTotalAgents = 0;
 	public static int currentJob = 0;
@@ -92,33 +95,30 @@ public class JaipurABM extends SimState{
 //		System.exit(0);
 //	}
 
-	public static double run_jobs(double A, double B, double beta, double delta, int n_jobs,
+	public static double run_jobs(double A, double B, double beta, double delta, double stdDevDelta, int n_jobs,
 								  String population_file, String outputFileName) throws IOException{
 		resultsFileName = outputFileName;
 		populationCSVfile = population_file;
+		socialPressureAverage = delta;
+		stdDevPressureDelta = stdDevDelta;
 		int thisJob = 0;
 		double avgR2 = 0;
 		for(int i = 0; i < n_jobs; i++){
 			System.out.println("this job number: " + thisJob);
-			avgR2 += run(A, B, beta, delta);
+			avgR2 += run(A, B, beta, socialPressureAverage, thisJob, stdDevPressureDelta);
 			thisJob++;
 		}
 		return avgR2/n_jobs;
 
 	}
-	public static double run(double A, double B, double beta, double delta) throws IOException{
-		//Date date = new Date();
-		//SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
-		//String stringDate = sdf.format(date);
-		//DataCollector.time_simulation_start = stringDate;
+	public static double run(double A, double B, double beta, double delta, int jobNum, double stdDevDelta) throws IOException{
 		DataCollector.time_simulation_start = resultsFileName;
-		//String in_file_name = "autogen" + numRuns + ".txt";
 		String in_file_name = "autogen.txt";
-		String output_file = String.format(in_file_name, new Object[0]);
+		String output_file = String.format(in_file_name);
 		GenerateInputFile(output_file, A, B, delta, beta);
 		DataCollector.in_filename = in_file_name;
 		runSimulation(in_file_name);
-		double r2 = DataCollector.calculateR2();
+		double r2 = DataCollector.calculateR2(jobNum);
 		numRuns++;
 		return r2;
 	}
@@ -170,10 +170,10 @@ public class JaipurABM extends SimState{
 		createAgentPopulation(populationArray);
 		if(!graphStructure.equalsIgnoreCase("original")){	//the original network allows each household to store its own network;
 			//all others take their network structure from the ABM itself
-			if(graphStructure.equalsIgnoreCase("kleinberg small world network")){
-				//call kleinberg generator
-				Graph KBSWgraph = generateKleinbergSmallWorldSocialNetwork();
-				createSocialNetwork(KBSWgraph);
+			if(graphStructure.equalsIgnoreCase("watts strogatz small world network")){
+				//call graph generator
+				graph = generateWattsStrogatzSmallWorldSocialNetwork();
+				createSocialNetwork(graph);
 			}
 			else{
 				System.out.println("no network structure identified, exiting");
@@ -210,14 +210,20 @@ public class JaipurABM extends SimState{
 		}
 	}
 
-	protected int getNumNewAgents(int[][] population, double timeStep){
+	public static int getNumNewAgents(double timeStep){
+		int[][] populationArray = scanInputCSV.popScan(populationCSVfile);
+		int numAgents = getNumNewAgents(populationArray, timeStep);
+		return numAgents;
+	}
+
+	private static int getNumNewAgents(int[][] population, double timeStep){
 		int intTimeStep = (int) timeStep;
 		int popPreviousTimeStep;
 		int numNewHouseholds;
 		int numTotalTimeSteps = population.length;
 		if(intTimeStep < 0 || intTimeStep > numTotalTimeSteps - 1){
-			System.out.println("incorrect time step");
-			return -1;
+			System.out.println("incorrect time step JaipurABM.getNumNewagents");
+			System.exit(1);
 		}
 		int popCurrentTimeStep = population[intTimeStep][1];
 
@@ -240,10 +246,10 @@ public class JaipurABM extends SimState{
 		return graphStructure;
 	}
 
-	public Graph generateKleinbergSmallWorldSocialNetwork(){
+	public Graph generateWattsStrogatzSmallWorldSocialNetwork(){
 		Graph graph = new SingleGraph("JaipurResidents");
 		if(numTotalAgents > 1){
-			Generator gen = new WattsStrogatzGenerator(numTotalAgents, 2, 0.5);//n number of agents, num connections k, rewiring probability beta
+			Generator gen = new WattsStrogatzGenerator(numTotalAgents, 48, 0.25);//n number of agents, num connections k, rewiring probability beta
 			gen.addSink(graph);
 			gen.begin();
 			while(gen.nextEvents()){
@@ -264,62 +270,102 @@ public class JaipurABM extends SimState{
 		try { Thread.sleep(300); } catch (Exception e) {}
 	}
 
+//	private void createSocialNetwork(Graph graph){
+//		//go through all households in the model
+//		for (Household hh : network){
+//			//get the current household's name
+//			String agentName = hh.getVertexName();
+//			//for this given node in the graph, find the corresponding agent
+//			for (Node n: graph){
+//				String nodePseudonym = "vert" + (n.getIndex());
+//
+//				//if the node corresponds with the agent, then we get all the agent's connections and store them in the acq array
+//				if(agentName.equals(nodePseudonym)){
+//					hh.acquaintances = findNeighborArray(n);
+//				}
+//			}
+//		}
+//	}
+
 	private void createSocialNetwork(Graph graph){
-		//go through all households in the model
-		for (Household hh : network){
-			//get the current household's name
-			String agentName = hh.getVertexName();
-			//for this given node in the graph, find the corresponding agent
-			for (Node n: graph){
-				String nodePseudonym = "vert" + (n.getIndex());
-				//if the node corresponds with the agent, then we get all the agent's connections and store them in the acq array
-				if(agentName.equals(nodePseudonym)){
-					hh.acquaintances = findNeighborArray(n);
-				}
-			}
+		assignUUIDsToGraph(graph);
+		for(Node n: graph){
+			assignNeighborArray(n);
+
+		}
+//		for(Node n: graph) {
+//			System.out.println("testing assignNeighborArray for node " + n.getAttribute("nodeUUID") + ": ");
+//		}
+	}
+
+	private void assignUUIDsToGraph(Graph graph){
+		int i = 0;
+		for(Node n: graph){
+			UUID correspondingHhUUID = network.get(i).getUUID();
+			n.setAttribute("nodeUUID", correspondingHhUUID);
+			i++;
 		}
 	}
 
-	private ArrayList<Household> findNeighborArray(Node node){
+	private void assignNeighborArray(Node node) {
+//		Household thisNodeCorrespondingHH = findHouseHoldFromUUID(node.getAttribute("nodeUUID"));
 		neighborArray = new ArrayList<Household>();
-		neighborHousehold = new Household();
+		neighborHousehold = null;
 		Collection<Edge> edgeCollection = node.getLeavingEdgeSet();
-		for (Edge edge: edgeCollection){
+		for (Edge edge : edgeCollection) {
 			Node oppositeNode = edge.getOpposite(node);
-			//find corresponding household in overall model
-			for (Household hh: network){
-				String comparedName = hh.getVertexName();
-				String vertexName = "vert" + oppositeNode;
-				if(!comparedName.equalsIgnoreCase(vertexName)){
-					continue;
-				}
-				else if(comparedName.equalsIgnoreCase(vertexName)){
-					UUID uuid = hh.getUUID();
-					for (Household potentialAcq : neighborArray){
-						if(uuid == potentialAcq.uuid){
-							continue;
-						}			
-					}
-					for (Household potentialAcq : hh.acquaintances){
-						if(uuid == potentialAcq.uuid){
-							continue;
-						}
-					}
-					neighborHousehold = findHouseHoldFromUUID(uuid);
-				}
-				else{
-					throw new IllegalArgumentException("error in VertexHouseholdEquivalent");
-				}
-				//JaipurABM.Household neighborHousehold = findVertexHouseholdEquivalent(edge.getOpposite(node));
-				neighborArray.add(neighborHousehold);
-			}
-			if(neighborArray.isEmpty()){
-				System.out.println("Error in neighbor array");
-				return null;
-			}
+			UUID oppositeNodeUUID = oppositeNode.getAttribute("nodeUUID");
+			neighborHousehold = findHouseHoldFromUUID(oppositeNodeUUID);
+			neighborArray.add(neighborHousehold);
 		}
-		return neighborArray;
+		node.setAttribute("neighborArray", neighborArray);
+//		thisNodeCorrespondingHH.acquaintances = neighborArray;
 	}
+
+//	private ArrayList<Household> findNeighborArray(Node node){
+//		neighborArray = new ArrayList<Household>();
+//		neighborHousehold = null;
+//		Collection<Edge> edgeCollection = node.getLeavingEdgeSet();
+//		for (Edge edge: edgeCollection){
+//			Node oppositeNode = edge.getOpposite(node);
+//			//find corresponding household in overall model
+//			for (Household hh: network){
+//				String comparedName = hh.getVertexName();
+//				String vertexName = "vert" + oppositeNode;
+//				if(!comparedName.equalsIgnoreCase(vertexName)){
+//					continue;
+//				}
+//				else if(comparedName.equalsIgnoreCase(vertexName)){
+//					UUID uuid = hh.getUUID();
+//					for (Household potentialAcq : neighborArray){
+//						if(uuid == potentialAcq.uuid){
+//							continue;
+//						}
+//					}
+//					for (Household potentialAcq : hh.acquaintances){
+//						if(uuid == potentialAcq.uuid){
+//							continue;
+//						}
+//					}
+//					neighborHousehold = findHouseHoldFromUUID(uuid);
+//				}
+//				else{
+//					throw new IllegalArgumentException("error in VertexHouseholdEquivalent");
+//				}
+//				//JaipurABM.Household neighborHousehold = findVertexHouseholdEquivalent(edge.getOpposite(node));
+//				if(neighborHousehold == null) {
+//					System.out.println("null neighbor added");
+//				} else{
+//					neighborArray.add(neighborHousehold);
+//				}
+//			}
+//			if(neighborArray.isEmpty()){
+//				System.out.println("Error in neighbor array");
+//				return null;
+//			}
+//		}
+//		return neighborArray;
+//	}
 
 	private Household findHouseHoldFromUUID(UUID uuidFind){
 		for (Household hh: network){
@@ -330,25 +376,25 @@ public class JaipurABM extends SimState{
 		System.out.println("findHouseholdFromUUID isn't working");
 		return null;
 	}
-	private static void GenerateInputFilesFromRanges(){
-		int talk_steps = 1;
-		int gen_ctr = 1;
-		for (double A = 1.0; A <= 10.0; A+=0.5) {
-			for (double B = 1.0; B <= 10.0; B+=0.5) {
-				for (double delta = 0.0; delta <= 0.3; delta+=0.1) {
-					for (double beta = 0; beta <= 1.0; beta+=0.1) {
-						for (int utility_steps = 6; utility_steps <= 60; utility_steps+=6) {
-							for (talk_steps = 6; talk_steps <= 60; talk_steps+=6) {
-								String output_file = String.format("./input/autogen_%s.txt", gen_ctr);
-								GenerateInputFile(output_file, A, B, delta, beta);
-								gen_ctr++;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+//	private static void GenerateInputFilesFromRanges(){
+//		int talk_steps = 1;
+//		int gen_ctr = 1;
+//		for (double A = 1.0; A <= 10.0; A+=0.5) {
+//			for (double B = 1.0; B <= 10.0; B+=0.5) {
+//				for (double delta = 0.0; delta <= 0.3; delta+=0.1) {
+//					for (double beta = 0; beta <= 1.0; beta+=0.1) {
+//						for (int utility_steps = 6; utility_steps <= 60; utility_steps+=6) {
+//							for (talk_steps = 6; talk_steps <= 60; talk_steps+=6) {
+//								String output_file = String.format("./input/autogen_%s.txt", gen_ctr);
+//								GenerateInputFile(output_file, A, B, delta, beta);
+//								gen_ctr++;
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
 	private static void GenerateInputFile(String output_file_name, double A, double B, double delta, double beta){
 		String s = new StringBuilder()
 				.append("Model Initialization Parameters\n")
@@ -357,18 +403,20 @@ public class JaipurABM extends SimState{
 				.append("1\n")
 				.append("Number of steps in main (2*(1 + number of dates to allow data collector to run—should be 458 for real run, 12 for test):\n")
 				.append("458\n")
+				//.append("6\n")
 				.append("Average household size:\n")
 				.append("5.1\n")
 				.append("\n")
 				.append("Social network setup (string):\n")
-				.append("original\n")
+				//.append("original\n")
+				.append("watts strogatz small world network")
 				.append("\n")
 				.append("OutputFileName (string):\n")
 				.append("/Users/lizramsey/Documents/workspace/JaipurABM.JaipurABM/GeneratedTXTs/Scenario19_0.05IC_a0.7_b0.3_et0_beta1_delta0_utilskip48_talkskip6.txt\n")
 				.append("\n")
 				.append("Agent Initialization Parameters\n")
 				.append("\n")
-				.append("Percent initial conservers:\n")
+				.append("Ratio initial conservers:\n")
 				.append("0.005\n")
 				.append("\n")
 				.append("Utility Function Parameters\n")
@@ -399,4 +447,7 @@ public class JaipurABM extends SimState{
 
 	}
 
+	public static Graph getGraph(){
+		return graph;
+	}
 }

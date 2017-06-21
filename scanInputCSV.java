@@ -69,37 +69,22 @@ public class scanInputCSV{
 		return count;
 	}
 
-
-	/**
-	 * Evaluates the existence of a file
-	 * @param filename the name of the file being evaluated
-	 * @return true, if successful
-	 */
-	public static boolean doesFileExist(String filename){
-		File f = new File(filename);
-		if(f.exists()) {
-			return true;
-		}
-		return false;
-	}
-
-	//TODO: complete this guy to read in values from a csv file of initializing data
 	public static void readInData(String dataSourceFile){
 		File fileName = new File(dataSourceFile);
 		if (!fileName.exists()){
 			System.out.println("DataSourceFile file not found, better luck next time!");
 			System.exit(1);
 		}
-		Scanner lineCountScanner;
+//		Scanner lineCountScanner;
 		Scanner fileScanner;   
-		try {
-			lineCountScanner = new Scanner(fileName);
-		} 
-		catch (FileNotFoundException e) {
-			System.out.println("No such file");
-			lineCountScanner = null;
-			System.exit(1);
-		}
+//		try {
+//			lineCountScanner = new Scanner(fileName);
+//		}
+//		catch (FileNotFoundException e) {
+//			System.out.println("No such file");
+//			lineCountScanner = null;
+//			System.exit(1);
+//		}
 		try {
 			fileScanner = new Scanner(fileName);
 		} 
@@ -165,28 +150,37 @@ public class scanInputCSV{
 		if(fileScanner.hasNextLine()){
 			JaipurABM.outputFileName = fileScanner.nextLine();
 		}
-		
+
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
+
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
-		if (fileScanner.hasNextLine()){
-			fileScanner.nextLine();
-		}
+
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
 		if (fileScanner.hasNextDouble()){
 			Household.percentConservers = fileScanner.nextDouble();
 		}
+
+//		if (fileScanner.hasNextLine()){
+//			fileScanner.nextLine();
+//		}
+//		if (fileScanner.hasNextDouble()){
+//			Household.percentConservers = fileScanner.nextDouble();
+//		}
+		//TODO: testing to get input file right
+
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
+
 		if (fileScanner.hasNextLine()){
 			fileScanner.nextLine();
 		}
@@ -198,10 +192,12 @@ public class scanInputCSV{
 		}
 		if (fileScanner.hasNextDouble()){
 			double aAndBPrime = fileScanner.nextDouble();
-			UtilityFunction.a = aAndBPrime;
-			UtilityFunction.bPrime = aAndBPrime;
+			UtilityFunction.setAandBPrime(aAndBPrime);
+//			UtilityFunction.a = aAndBPrime;
+//			UtilityFunction.bPrime = aAndBPrime;
 			System.out.println("a and b prime: " + UtilityFunction.a + " " + UtilityFunction.bPrime);
 		}
+
 		if (fileScanner.hasNextLine()){
 			String test = fileScanner.nextLine();
 		}
@@ -210,8 +206,7 @@ public class scanInputCSV{
 		}
 		if (fileScanner.hasNextDouble()){
 			double bAndAPrime = fileScanner.nextDouble();
-			UtilityFunction.b = bAndAPrime;
-			UtilityFunction.aPrime = bAndAPrime;
+			UtilityFunction.setBandAPrime(bAndAPrime);
 			System.out.println("b and a prime: " + UtilityFunction.b + " " + UtilityFunction.aPrime);
 		}
 		if (fileScanner.hasNextLine()){
