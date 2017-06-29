@@ -1,7 +1,7 @@
 package JaipurABM;
 
 public class ProbabilityOfBehavior {
-	public static double beta = 0.5;
+	private static double beta = 0.5;
 	
 	public static double probabilityConsToCons(double utilConsToCons, double utilConsToNonCons){
 		double numerator = Math.exp(utilConsToCons * beta);
@@ -36,5 +36,13 @@ public class ProbabilityOfBehavior {
 //		System.out.println("util noncons to cons: " + utilNonConsToCons + " util noncons to noncons: " + utilNonConsToNonCons);
 //		System.out.println("probability noncons to noncons: " + probability);
 		return probability;
+	}
+
+	public static void setBeta(double betaVal){
+		beta = betaVal;
+	}
+
+	public static double getBeta(){
+		return beta;
 	}
 }

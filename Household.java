@@ -484,5 +484,9 @@ public class Household implements Steppable {
 		}
 	}
 
+	public static void setPercentConservers(double percCons){
+		percentConservers = percCons;
+	}
+
 }
 
