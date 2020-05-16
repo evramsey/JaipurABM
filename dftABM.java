@@ -1,5 +1,3 @@
-package JaipurABM;
-
 import org.graphstream.algorithm.generator.Generator;
 import org.graphstream.algorithm.generator.RandomGenerator;
 import org.graphstream.algorithm.generator.WattsStrogatzGenerator;
@@ -8,7 +6,6 @@ import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
 import sim.engine.SimState;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,22 +14,16 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Scanner;
 
-
 /**
  *A model of dual flush toilet adoption through a growing population.
  * @author E.V. Ramsey and E.Z. Berglund
  */
-public class JaipurABM extends SimState {
+public class dftABM extends SimState {
 
-	//graphStructure acts as the seed to determine which social network to implement
-	//"original" is for network broken down by friends, acquaintances, and families, selected randomly
-	//"kleinbergSmallWorldNetwork" is for Kleinberg Small World
 	public static int graphStructureNum; //1 = random, 2 = random w/ social networks, 3 = WS small world
 	public static Graph socialGraph;
 	public static String resultsFileName;
 	private static boolean has3Networks;
-	public static double socialPressureAverage;
-	public static double stdDevPressureDelta;
 	public static int numRuns = 1;
 	public static int numStepsInMain;
 	public static String populationCSVfile;
@@ -44,39 +35,38 @@ public class JaipurABM extends SimState {
 	private static int avgNumConnections = 48;
 	private static boolean lastYearWasDroughtYear = false;
 
-	public JaipurABM(long seed) {
+	public dftABM(long seed) {
 		super(seed);
 	}
 
     /**
-     *
+     * Run the ABM for n number of jobs and return the standard error of the regression, S
      * @param avgConnections average number of connections between agents
      * @param A parameter for similar behavior
      * @param B parameter for dissimilar behavior
-     * @param beta 
-     * @param delta
-     * @param stdDevDelta
-     * @param exogTerm
-     * @param exogTermDrought
-     * @param numSkippedTalkSteps
-     * @param numSKippedUtilUpdateSteps
-     * @param n_jobs
-     * @param population_file
-     * @param outputFileName
-     * @param deleteAutogen
-     * @param networkStructure
-     * @return val
+     * @param beta parameter for stochasticity of agent decision
+     * @param exogTerm parameter for misc. external influences on decision-making
+     * @param exogTermDrought parameter drought's influence on decisionmaking
+     * @param numSkippedTalkSteps parameter for delay in agent communication
+     * @param numSkippedUtilUpdateSteps parameter for delay in agent decision-making
+     * @param n_jobs number of runs for model to take average of
+     * @param population_file location of population input file
+     * @param outputFileName location for output files
+     * @param deleteAutogen boolean for whether or not to delete auto-generated outputs (useful if running many simulations)
+     * @param networkStructure integer for constructing network structure; 1 is random, 2 is random with social networks,
+	 *                            3 is Watts Strogatz small world
+     * @return the average value of S across n simulations
      * @throws IOException
      */
-	public static double runJobs(int avgConnections, double A, double B, double beta, double delta, double stdDevDelta, double exogTerm,
-                                 double exogTermDrought, int numSkippedTalkSteps, int numSKippedUtilUpdateSteps, int n_jobs,
+	public static double runJobs(int avgConnections, double A, double B, double beta, double exogTerm,
+                                 double exogTermDrought, int numSkippedTalkSteps, int numSkippedUtilUpdateSteps, int n_jobs,
                                  String population_file, String outputFileName, boolean deleteAutogen,
                                  int networkStructure) throws IOException {
 		avgNumConnections = avgConnections;
 		double totalStandardError = 0.0;
 		for (int i = 0; i < n_jobs; i++) {
 			System.out.println("this job number: " + currentJob);
-			totalStandardError += run(A, B, beta, delta, stdDevDelta, exogTerm, exogTermDrought, numSkippedTalkSteps, numSKippedUtilUpdateSteps,
+			totalStandardError += run(A, B, beta, exogTerm, exogTermDrought, numSkippedTalkSteps, numSkippedUtilUpdateSteps,
 					currentJob, population_file, outputFileName, deleteAutogen, networkStructure);
 			currentJob++;
 			File autoGen = new File("./output/" + outputFileName + "/autogen_output.csv");
@@ -87,18 +77,36 @@ public class JaipurABM extends SimState {
 				}
 			}
 		}
-		double val = totalStandardError / n_jobs;
-		return val;
+		double avgS = totalStandardError / n_jobs;
+		return avgS;
 	}
 
-	//delta and stdDevDelta only apply to three network structure, which we are no longer using, but we'll leave it in here rather than recoding.
-	public static double run(double A, double B, double beta, double delta, double stdDevDelta, double exogTerm, double exogTermDrought, int numSkippedTalkSteps, int numSkippedUtilUpdateSteps,
-							 int jobNum, String population_file, String outputFileName, boolean deleteAutogen, int netStructure) throws IOException {
-		SimState state = new JaipurABM(System.currentTimeMillis());
+	/**
+	 * Run the ABM for a single iteration
+	 * @param A parameter for similar behavior
+	 * @param B parameter for dissimilar behavior
+	 * @param beta parameter for stochasticity of agent decision
+	 * @param exogTerm parameter for misc. external influences on decision-making
+	 * @param exogTermDrought parameter drought's influence on decisionmaking
+	 * @param numSkippedTalkSteps parameter for delay in agent communication
+	 * @param numSkippedUtilUpdateSteps parameter for delay in agent decision-making
+	 * @param jobNum iteration number of current simulation
+	 * @param population_file location of population input file
+	 * @param outputFileName location for output files
+	 * @param deleteAutogen boolean for whether or not to delete auto-generated outputs (useful if running many simulations)
+	 * @param networkStructure integer for constructing network structure; 1 is random, 2 is random with social networks,
+	 *                            3 is Watts Strogatz small world
+	 * @return
+	 * @throws IOException
+	 */
+	public static double run(double A, double B, double beta, double exogTerm, double exogTermDrought,
+							 int numSkippedTalkSteps, int numSkippedUtilUpdateSteps, int jobNum, String population_file,
+							 String outputFileName, boolean deleteAutogen, int networkStructure) throws IOException {
+		SimState state = new dftABM(System.currentTimeMillis());
 		resultsFileName = outputFileName;
 		DataCollector.outputFileIdentifier = resultsFileName;
-		setModelInputs(A, B, beta, delta, stdDevDelta, exogTerm, exogTermDrought, numSkippedTalkSteps, numSkippedUtilUpdateSteps,population_file,
-				outputFileName, deleteAutogen, netStructure);
+		setModelInputs(A, B, beta, exogTerm, exogTermDrought, numSkippedTalkSteps, numSkippedUtilUpdateSteps,population_file,
+				outputFileName, deleteAutogen, networkStructure);
 		String in_file_name = "autogen.txt";
 		DataCollector.in_filename = in_file_name;
 		state.nameThread();
@@ -117,18 +125,22 @@ public class JaipurABM extends SimState {
 		double mnse = DataCollector.calculate_mod_NSE(jobNum);
 		numRuns++;
 		return sn;
-		//return -1;
 	}
 
+	/**
+	 *  Create a new list of household agents and their network at beginning of simulation
+	 */
 	public static void initialize_agents() {
-		network = new ArrayList<Household>();
-		//newAgentsAtThisTimeStepOriginalNetwork = new ArrayList<Household>();
+		network = new ArrayList<>();
 		Household.houseHoldAgents = new ArrayList<>();
 		numTotalAgents = 0;
 		vertexNumber = 0;
 		System.out.println("Network agents initialized");
 	}
 
+	/**
+	 * Start the simulation by creating population of agents and placing them in the network and on a schedule
+	 */
 	public void start() {
 		DataCollector dc = new DataCollector();
 		schedule.clear();
@@ -136,10 +148,12 @@ public class JaipurABM extends SimState {
 		super.start();
 		createAgentPopulation(populationArray);
 		createGraphAndNetwork();
-
-		schedule.scheduleRepeating(0.1, dc); //puts JaipurABM.DataCollector on schedule
+		schedule.scheduleRepeating(0.1, dc); //puts dftABM.DataCollector on schedule
 	}
 
+	/**
+	 * Create desired social network graph and assign agents to each node
+	 */
 	public void createGraphAndNetwork() {
 		if (graphStructureNum == 3) {
 			socialGraph = generateWattsStrogatzSmallWorldSocialNetwork();
@@ -156,8 +170,6 @@ public class JaipurABM extends SimState {
 					}
 				for (Edge edge1 : edgeCollection) {
 					if (!edge1.hasAttribute("relationship")) {
-						Node oppNode = edge1.getOpposite(node);
-						System.out.println("why don't " + node.getIndex() + " and " + oppNode.getIndex() + " have a relationship?");
 						edge1.setAttribute("relationship", "acquaintance");
 					}
 				}
@@ -169,6 +181,12 @@ public class JaipurABM extends SimState {
 		}
 	}
 
+	/**
+	 * Add agent A to agent B's social network and agent B to agent A's social network
+	 * @param hh given household agent
+	 * @param node agent's location in grid
+	 * @param edge connection between agent A and another agent B
+	 */
 	private void addToNetworks(Household hh, Node node, Edge edge){
 		int maxNumFamConnections = hh.getMaxNumFamilyMembers();
 		int maxNumFriendConnections = hh.getMaxNumCloseFriends();
@@ -201,29 +219,10 @@ public class JaipurABM extends SimState {
 		}
 	}
 
-
-	private void checkAndUpdateNetworkSizes(Household hh, Collection<Edge> edgeCollection) {
-		for (Edge edge : edgeCollection) {
-			if (edge.hasAttribute("relationship")) {
-				String relationship = edge.getAttribute("relationship");
-				if (relationship.equals("family")) {
-					hh.increaseNumFamilyMembers();
-				} else if (relationship.equals("friend")) {
-					hh.increaseNumFriends();
-				} else if (relationship.equals("acquaintance")) {
-					hh.increaseNumAcquaintances();
-				} else {
-					System.out.println("error in 3 networks relationship assignment");
-					System.out.println(relationship);
-				}
-
-			}
-		}
-	}
-
-
-	/*
-    Create number of agents at [n] time step and store in agent array.
+	/**
+	 * Create a new agent,add it to the network, and return it
+	 * @param timeStep
+	 * @return new household agent
 	 */
 	public Household createNewAgent(double timeStep) {
 		Household hh = new Household(vertexNumber, timeStep);   //passes that property array to the new agents
@@ -232,6 +231,10 @@ public class JaipurABM extends SimState {
 		return hh;
 	}
 
+	/**
+	 * Create a population of agents and add them to the network and scheduler
+	 * @param populationArray
+	 */
 	protected void createAgentPopulation(int[][] populationArray) {
 		int numTimeSteps = populationArray.length;
 		for (int i = 0; i < numTimeSteps; i++) {                                            //for each time step i
@@ -247,6 +250,10 @@ public class JaipurABM extends SimState {
 		}
 	}
 
+	/**
+	 * Generate a random network graph
+	 * @return the graph structure
+	 */
 	protected Graph generateRandomGraph() {
 		Graph graph = new SingleGraph("Random");
 		Generator gen = new RandomGenerator(avgNumConnections);
@@ -258,13 +265,19 @@ public class JaipurABM extends SimState {
 	}
 
 
+	/**
+	 * Calculate the number of new household agents calculated at a given time step
+	 * @param population array of population numbers for simulation
+	 * @param timeStep current time step of model
+	 * @return the number of households introduced at time step
+	 */
 	private static int getNumNewAgents(int[][] population, double timeStep) {
 		int intTimeStep = (int) timeStep;
 		int popPreviousTimeStep;
 		int numNewHouseholds;
 		int numTotalTimeSteps = population.length;
 		if (intTimeStep < 0 || intTimeStep > numTotalTimeSteps - 1) {
-			System.out.println("incorrect time step JaipurABM.getNumNewagents");
+			System.out.println("incorrect time step dftABM.getNumNewagents");
 			System.exit(1);
 		}
 		int popCurrentTimeStep = population[intTimeStep][1];
@@ -278,10 +291,10 @@ public class JaipurABM extends SimState {
 		}
 	}
 
-	public static int getCurrentJob() {
-		return currentJob;
-	}
-
+	/**
+	 * Generate a Watts Strogatz Small World Network graph
+	 * @return the graph
+	 */
 
 	public Graph generateWattsStrogatzSmallWorldSocialNetwork() {
 		Graph graph = new SingleGraph("JaipurResidents");
@@ -301,15 +314,24 @@ public class JaipurABM extends SimState {
 			return graph;
 		}
 	}
-//
-//	protected void sleep() {
-//		try {
-//			Thread.sleep(100);
-//		} catch (Exception e) {
-//		}
-//	}
 
-	private static void setModelInputs(double A, double B, double beta, double delta, double stdDevDelta, double exogTerm, double exogTermDrought, int numSkippedTalkSteps,
+	/**
+	 * Set model input parameters at the beginning of the simulation
+	 * @param A parameter for similar behavior
+	 * @param B parameter for dissimilar behavior
+	 * @param beta parameter for stochasticity of agent decision
+	 * @param exogTerm parameter for misc. external influences on decision-making
+	 * @param exogTermDrought parameter drought's influence on decisionmaking
+	 * @param numSkippedTalkSteps parameter for delay in agent communication
+	 * @param numSkippedUtilitySteps parameter for delay in agent decision-making
+	 * @param popFileName name of population file input
+	 * @param outFileName name of desired output file
+	 * @param deleteAutogen boolean for whether or not to delete auto-generated outputs (useful if running many simulations)
+	 * @param netStructure integer for constructing network structure; 1 is random, 2 is random with social networks,
+	 *                            3 is Watts Strogatz small world
+	 * @throws FileNotFoundException
+	 */
+	private static void setModelInputs(double A, double B, double beta, double exogTerm, double exogTermDrought, int numSkippedTalkSteps,
 									   int numSkippedUtilitySteps, String popFileName, String outFileName, boolean deleteAutogen,
 									   int netStructure) throws FileNotFoundException {
 		UtilityFunction.setAandBPrime(A);
@@ -317,8 +339,6 @@ public class JaipurABM extends SimState {
 		Household.setExogenousTermSeed(exogTerm);
 		Household.setExogenousTermDroughtSeed(exogTermDrought);
 		ProbabilityOfBehavior.setBeta(beta);
-		socialPressureAverage = delta;
-		stdDevPressureDelta = stdDevDelta;
 		Household.setUtilSkipStepSeed(numSkippedUtilitySteps);
 		Household.setTalkSkipStepSeed(numSkippedTalkSteps);
 		Household.setPercentConsEachTimeStep(0);
@@ -333,7 +353,7 @@ public class JaipurABM extends SimState {
 			has3Networks = true;
 		}
 		else{
-			System.out.println("no network structure specified in JaipurABM.setModelInputs, exiting");
+			System.out.println("no network structure specified in dftABM.setModelInputs, exiting");
 			System.exit(1);
 		}
 		populationCSVfile = popFileName;
@@ -344,7 +364,7 @@ public class JaipurABM extends SimState {
 		try {
 			popScan = new Scanner(popFile);
 		} catch (FileNotFoundException e) {
-			System.out.println("error in reading file in JaipurABM.setModelInputs");
+			System.out.println("error in reading file in dftABM.setModelInputs");
 		}
 		while (popScan.hasNextLine()) {
 			popScan.nextLine();
@@ -353,6 +373,12 @@ public class JaipurABM extends SimState {
 		numStepsInMain = lineNum * 2;
 	}
 
+	/**
+	 * Select an agent to communicate with from among its social network
+	 * @param vertexIndex the index of the agent initiating the communication
+	 * @param timeStep the time step at which the agent is communicating
+	 * @return the selected agent
+	 */
 	public static int getCommunicatedAgent(int vertexIndex, double timeStep){
 		Node thisVertNode = socialGraph.getNode(vertexIndex);
 		Collection<Edge> edgeCollection = thisVertNode.getLeavingEdgeSet();
@@ -373,11 +399,18 @@ public class JaipurABM extends SimState {
 		return -1;
 	}
 
+	/**
+	 * Determine the relationship between wo agents: friend, family, or acquaintance; for network type 1, all agents are
+	 * only acquaintances
+	 * @param thisVertexIndex the index of the agent communicating
+	 * @param oppVertexIndex the index of the agent being communicated with
+	 * @return the relationship integer
+	 */
+
 	public static int getTypeOfRelationship(int thisVertexIndex, int oppVertexIndex){
 		Node thisVertNode = socialGraph.getNode(thisVertexIndex);
-		Node oppVertNode = socialGraph.getNode(oppVertexIndex);
 		Edge relationshipEdge = thisVertNode.getEdgeBetween(oppVertexIndex);
-		String relationship = "";
+		String relationship;
 		if(relationshipEdge.hasAttribute("relationship")) {
 			relationship = relationshipEdge.getAttribute("relationship");
 			if (relationship.equalsIgnoreCase("family")) {
@@ -394,6 +427,11 @@ public class JaipurABM extends SimState {
 			System.out.println(thisVertNode.getIndex() + " and " + oppVertexIndex + "have no relationships");
 			return -1;
 		}
+	}
+
+
+	public static int getCurrentJob() {
+		return currentJob;
 	}
 
 	public static boolean doesModelHave3Networks(){return has3Networks;}
