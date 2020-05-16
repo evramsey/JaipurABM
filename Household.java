@@ -1,107 +1,86 @@
-package JaipurABM;
-
 import ec.util.MersenneTwisterFast;
-import org.graphstream.graph.Graph;
-import org.graphstream.graph.Node;
 import sim.engine.SimState;
 import sim.engine.Steppable;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
- * @author lizramsey
- *         approximates behaviors of households with indoor plumbing
+ *  Agent class of households
  */
 
 public class Household implements Steppable {
-
 	public static ArrayList<Household> houseHoldAgents = new ArrayList<>();
-	public static double percentConservers;
-	protected static MersenneTwisterFast rng = new MersenneTwisterFast();    //Random number generator for cycling agents during friendship assignment.
-
-	//personal attributes for each JaipurABM.Household Agent
-	private int independentLikelihoodDFInstall;
-	private int friendLikelihoodDFInstall;
-	protected int familyLikelihoodDFInstall;
-
-	public int householdSize;
+	private static double percentConsEachTimeStep;
+	private static double percentInitialCons;
+	protected static MersenneTwisterFast rng = new MersenneTwisterFast();    //Random number generator
 	public boolean isConserver;
-	protected String vertexName;
+	private boolean has3SocialNetworks;
+	private int vertexIndex;
 	public double monthlyDemand;
 	public int maxNumFamilyMembers;
 	public int maxNumCloseFriends;
-	public int maxNumConnections;
-	public int maxNumAcquaintances;
+	public int currentNumFamilyMembers;
+	public int currentNumCloseFriends;
+	public int currentNumAcquaintances;
+	public int currentNumConnections;
 	int numSkippedStepsUtilUpdate;
 	int numSkippedStepsTalkUpdate;
-    private int remainingConnections;
+    public double exogenousTerm;
+	public double exogenousTermDrought;
+	public int householdSize;
+    private static double exogenousTermSeed;
+	private static double exogenousTermDroughtSeed;
     private double familyDelta;
+	private static int utilSkipStepSeed;
+	private static int talkSkipStepSeed;
     private double friendDelta;
-    private boolean converted_WC_to_NC = false;
-    private boolean converted_NC_to_WC = false;
 	private double RatioFamConservers;
 	private double RatioFamNonConservers;
 	private double RatioFriendConservers;
 	private double RatioFriendNonConservers;
 	private double RatioAcqConservers;
 	private double RatioAcqNonConservers;
-
-    public UUID uuid;//Unique ID for this particular agent
-	public ArrayList<Household> acquaintances = new ArrayList<Household>();
-	protected ArrayList<Household> closeFriends = new ArrayList<Household>();
-	protected ArrayList<Household> respectedFamilyMembers = new ArrayList<Household>();//An array of IDs for agents that are in this agent's network
-
 	protected ArrayList<Household> acqAlreadySpokenTo = new ArrayList<Household>();
 	protected ArrayList<Household> friendsAlreadySpokenTo = new ArrayList<Household>();
 	protected ArrayList<Household> famAlreadySpokenTo = new ArrayList<Household>();
-
-	protected ArrayList<UUID> relatedUuids = new ArrayList<>();
-
 	protected double timeStepBorn;
 
 	/**
-	 * Default constructor
-	 */
-	public Household(){}
-
-	/**
-	 * 
+	 * Constructor of household agent
 	 * @param vertexNumber
 	 * @param timeStep
 	 */
 	public Household (int vertexNumber, double timeStep) {
-		independentLikelihoodDFInstall = ValueGenerator.getValueLikert(2.88, 1.46);//ind likelihood DFI, from survey
-		friendLikelihoodDFInstall = ValueGenerator.getValueLikert(3.12, 1.43);//friend likelihood DFI, from survey
-		familyLikelihoodDFInstall = ValueGenerator.getValueLikert(3.8, 1.48);//family likelihood DFI, from survey
-		familyDelta = ValueGenerator.generateSocialPressureDelta(JaipurABM.socialPressureAverage, JaipurABM.stdDevPressureDelta);
-		friendDelta = ValueGenerator.generateSocialPressureDelta(JaipurABM.socialPressureAverage, JaipurABM.stdDevPressureDelta);
-		householdSize = ValueGenerator.getPoissonValueWithMaxAndMin(5.1, 1, 20);//household size, from 2011 census
-		isConserver = generateConservationStatus();
-		vertexName	= "vert" + vertexNumber;
-		maxNumConnections = ValueGenerator.getPoissonValueWithMaxAndMin(48.0, 11, 185);
-		maxNumFamilyMembers = ValueGenerator.getPoissonValueWithMaxAndMin(5.48, 0,10);
-		maxNumCloseFriends = ValueGenerator.getPoissonValueWithMaxAndMin(2.64, 0, 10);
-		numSkippedStepsUtilUpdate = ValueGenerator.getPoissonValue(120);
-		numSkippedStepsTalkUpdate = ValueGenerator.getPoissonValue(12);
-		maxNumAcquaintances = maxNumConnections - maxNumFamilyMembers - maxNumCloseFriends;
-		if(maxNumAcquaintances < 0) {
-            maxNumAcquaintances = 0;
-        }
-
-        setRemainingConnections();
-
-		uuid = UUID.randomUUID(); //set uuid
+		householdSize = ValueGenerator.getPoissonValue(5.15);//household size, from 2011 census
+		isConserver = generateConservationStatus(timeStep);
+		vertexIndex = vertexNumber;
+		has3SocialNetworks = dftABM.doesModelHave3Networks();
+		currentNumFamilyMembers = 0;
+		currentNumCloseFriends = 0;
+		currentNumAcquaintances = 0;
+		currentNumConnections = 0;
+		numSkippedStepsUtilUpdate = ValueGenerator.getPoissonValue(utilSkipStepSeed);
+		numSkippedStepsTalkUpdate = ValueGenerator.getPoissonValue(talkSkipStepSeed);
+		if(exogenousTermSeed == 0.0){
+			exogenousTerm = 0.0;
+		}
+		else {
+			exogenousTerm = ValueGenerator.createNormalDistSample(exogenousTermSeed, 0.1);
+		}
+		if(exogenousTermDroughtSeed == 0.0){
+			exogenousTermDrought = 0.0;
+		}
+		else{
+			exogenousTermDrought = ValueGenerator.createNormalDistSample(exogenousTermDroughtSeed, 0.1);
+		}
 		timeStepBorn = timeStep;
 	}
 
-
-
-	public void step(SimState state) {
-		prepareStep(state);
+	/**
+	 * Actions taken by an agent at each time step
+	 * @param state
+	 */
+    public void step(SimState state) {
 		monthlyDemand = getThisHouseholdDemand();
 		DataCollector.CumulativeDemand = DataCollector.CumulativeDemand + monthlyDemand;
 		DataCollector.modelPopulation = DataCollector.modelPopulation + this.householdSize;
@@ -109,62 +88,73 @@ public class Household implements Steppable {
 		if(isConserver){
 			DataCollector.numConservers++;
 		}
-		String graphStructure = JaipurABM.getGraphStructure();
-		//TODO: bracketed out to find updating error
-		if(graphStructure.equalsIgnoreCase("original")){
-			talkToThreeNetworks(state);
-		}
-		else{
-			talk(acquaintances, acqAlreadySpokenTo, state);
-		}
-		if(shouldSkipStep(numSkippedStepsUtilUpdate)){
+		int graphStructure = dftABM.getGraphStructureNum();
+		if(!this.existsAtTimeStep(state.schedule.getTime())){
 			return;
 		}
-		//to prevent reversing of conservation decisions (DF toilet installation is permanent, at least in this model for now)
-		//TODO:testing reversible conservation behaviors by bracketing out !isConserver
-		//if(!isConserver){
-			calculateUtilityandUpdateConsumption();
-		//}
+		boolean droughtBool = dftABM.getLastYearDroughtIndex();
+			if (!shouldSkipStep(numSkippedStepsTalkUpdate)) {
+				talk(graphStructure, state);
+			}
+			if(shouldSkipStep(numSkippedStepsUtilUpdate)){
+				return;
+			}
+			//irreversible conservation behaviors
+			if (!isConserver) {
+				if(droughtBool){
+					calculateUtilityandUpdateConsumption(exogenousTermDrought);//add drought term
+				}
+				else {
+					calculateUtilityandUpdateConsumption(0);//set drought term = 0
+				}
+			}
 	}
 
-	public String getVertexName() {
-		return vertexName;
-	}
-
-	public void setHouseholdSize(int newHouseholdSize) {
-		householdSize = newHouseholdSize;
-	}
-
-	public static boolean generateConservationStatus() {
+	/**
+	 * Calculate whether agent changes adoption/conservation status
+	 * @param thisTimeStep
+	 * @return boolean of status change
+	 */
+	public static boolean generateConservationStatus(double thisTimeStep) {
 		double num = rng.nextDouble(true, false);    //includes 0.0 and 1.0 in randomly drawn number's interval
-		return num < percentConservers || num == percentConservers;
-	}
-	public void setRemainingConnections(){
-		int nExistingConnections = respectedFamilyMembers.size() + closeFriends.size() + acquaintances.size();
-		remainingConnections = maxNumConnections - nExistingConnections;
-
-		if (nExistingConnections > maxNumConnections){
-			System.out.println("JaipurABM.Household has more connections (" + nExistingConnections
-					+ ") than maximum allowed connections (" + maxNumConnections + ")");
+		if (thisTimeStep == 0){
+			return num < percentInitialCons || num == percentInitialCons;
+		}
+		else {
+			return num < percentConsEachTimeStep || num == percentConsEachTimeStep;
 		}
 	}
 
-	//TODO: once the model is running, edit this with realistic consumption values and months
+	/**
+	 * Calculate household demand, based on static input parameters
+	 * @return calculated demand, in gallons per month
+	 */
 	public double getThisHouseholdDemand() {
 		double demand;
 		if (!isConserver) {
-			demand = householdSize * 125 * 30;
+			demand = householdSize * 200 * (365/12.0);
 		} else {
-			demand = householdSize * 100 * 30;
+			demand = householdSize * (200 - (5.1*1.52)) * (365/12.0);//1.52 is difference per flush, 5.1 is average number of flushes per person per day
 		}
 		return demand;
 	}
 
-	public double calculateRatiosForUtilityFxn(ArrayList<Household> thisList, ArrayList<Household> communicatedList, boolean calculatingConserver){ 
+	/**
+	 *
+	 * @param communicatedList
+	 * @param calculatingConserver
+	 * @return
+	 */
+	public double calculateRatiosForUtilityFxn(ArrayList<Household> communicatedList, boolean calculatingConserver){
 		int numConserversSpokenTo = 0;
-		int numNonConserversSpokenTo = 0;
-		//TODO: changing the network size to include everyone in social network, not just the one list
-		int networkSize = this.acquaintances.size() + this.closeFriends.size() + this.respectedFamilyMembers.size();
+		int numNonConserversSpokenTo;
+		int networkSize;
+		if(has3SocialNetworks){
+			networkSize = currentNumAcquaintances + currentNumFamilyMembers + currentNumCloseFriends;
+		}
+		else {
+			networkSize = currentNumAcquaintances;
+		}
 		double ratio = 0.0;
 		for (Household hh: communicatedList){
 			if(hh.isConserver){
@@ -181,7 +171,7 @@ public class Household implements Steppable {
 				ratio = numConsDouble/networkSize;
 			}
 		}
-		else{       
+		else{
 			if(numNonConserversSpokenTo == 0 || networkSize == 0){
 				ratio = 0.0;
 			}
@@ -189,304 +179,246 @@ public class Household implements Steppable {
 				double numNonConsDouble = (double)(numNonConserversSpokenTo);
 				ratio = numNonConsDouble/networkSize;
 			}
-		}      
-		return ratio;      
+		}
+		return ratio;
 	}
 
-	private void calculateUtilityandUpdateConsumption() {
-		RatioFamConservers = calculateRatiosForUtilityFxn(respectedFamilyMembers, famAlreadySpokenTo, true);
-		RatioFamNonConservers = calculateRatiosForUtilityFxn(respectedFamilyMembers, famAlreadySpokenTo, false);
-		RatioFriendConservers = calculateRatiosForUtilityFxn(closeFriends, friendsAlreadySpokenTo, true);
-		RatioFriendNonConservers = calculateRatiosForUtilityFxn(closeFriends, friendsAlreadySpokenTo, false);
-		RatioAcqConservers = calculateRatiosForUtilityFxn(acquaintances, acqAlreadySpokenTo, true);
-		RatioAcqNonConservers = calculateRatiosForUtilityFxn(acquaintances, acqAlreadySpokenTo, false);
+	/**
+	 * Call utility calculation functions for changing and maintaining conservation status, then update consumption
+	 * @param exogTermDrought
+	 */
+	private void calculateUtilityandUpdateConsumption(double exogTermDrought) {
+		if(!has3SocialNetworks){
+			RatioAcqConservers = calculateRatiosForUtilityFxn(acqAlreadySpokenTo, true);
+			RatioAcqNonConservers = 1 - RatioAcqConservers;
+		}
+		else {
+			RatioFamConservers = calculateRatiosForUtilityFxn(famAlreadySpokenTo, true);
+			RatioFamNonConservers = 1 - RatioFamConservers;
+			RatioFriendConservers = calculateRatiosForUtilityFxn(friendsAlreadySpokenTo, true);
+			RatioFriendNonConservers = 1 - RatioFriendConservers;
+			RatioAcqConservers = calculateRatiosForUtilityFxn(acqAlreadySpokenTo, true);
+			RatioAcqNonConservers = 1 - RatioAcqConservers;
+		}
+		if(has3SocialNetworks){
+			calculateUtilFor3Networks(exogTermDrought);
+		}
+		else{
+			calculateUtilFor1Network(exogTermDrought);
+		}
+	}
 
-		//int famDelta = calculateDelta(this.independentLikelihoodDFInstall, this.familyLikelihoodDFInstall);
-		//int friendDelta = calculateDelta(this.independentLikelihoodDFInstall, this.friendLikelihoodDFInstall);
+	/**
+	 * Calculate utility for behaviors if agent has friends, family, and acquaintance networks and update status
+	 * @param exogTermDrought
+	 */
+	private void calculateUtilFor3Networks(double exogTermDrought){
 		if (isConserver) {
 			double randNum = rng.nextDouble(true, false);
-//			double utilStay = UtilityFunction.calculateUtilityForConserverStayingConserver(RatioFamConservers,
-//					famDelta, RatioFriendConservers, friendDelta, RatioAcqConservers);
-//			double utilChange = UtilityFunction.calculateUtilityForConserverBecomingNonConserver(RatioFamNonConservers,
-//					famDelta, RatioFriendNonConservers, friendDelta, RatioAcqNonConservers);
-			double utilStay = UtilityFunction.calculateUtilityForConserverStayingConserver(RatioFamConservers,
-					familyDelta, RatioFriendConservers, friendDelta, RatioAcqConservers);
-			double utilChange = UtilityFunction.calculateUtilityForConserverBecomingNonConserver(RatioFamNonConservers,
+			double utilStay = UtilityFunction.calculateUtilityForConserverStayingConserver3Networks(RatioFamConservers,
+					familyDelta, RatioFriendConservers, friendDelta, RatioAcqConservers, exogenousTerm, exogTermDrought);
+			double utilChange = UtilityFunction.calculateUtilityForConserverBecomingNonConserver3Networks(RatioFamNonConservers,
 					familyDelta, RatioFriendNonConservers, friendDelta, RatioAcqNonConservers);
 			double probabilityConsToCons = ProbabilityOfBehavior.probabilityConsToCons(utilStay, utilChange);
 			if (randNum >= probabilityConsToCons) {
 				isConserver = false;
-				converted_WC_to_NC = true;
-				//System.out.println(vertexName + " is changing from conserver to nonconserver");
 			}
 		} else {
 			double randNum = rng.nextDouble(true, false);
-			double utilStay = UtilityFunction.calculateUtilityForNonConserverStayingNonConserver(RatioFamNonConservers,
+			double utilStay = UtilityFunction.calculateUtilityForNonConserverStayingNonConserver3Networks(RatioFamNonConservers,
 					familyDelta, RatioFriendNonConservers, friendDelta, RatioAcqNonConservers);
-			double utilChange = UtilityFunction.calculateUtilityForNonConserverBecomingConserver(RatioFamConservers,
-					familyDelta, RatioFriendConservers, friendDelta, RatioAcqConservers);
+			double utilChange = UtilityFunction.calculateUtilityForNonConserverBecomingConserver3Networks(RatioFamConservers,
+					familyDelta, RatioFriendConservers, friendDelta, RatioAcqConservers, exogenousTerm, exogTermDrought);
 			double probabilityNonConsToNonCons = ProbabilityOfBehavior.probabilityNonConsToNonCons(utilChange, utilStay);
 			if (randNum >= probabilityNonConsToNonCons) {
 				isConserver = true;
-				converted_NC_to_WC = true;
 			}
 		}
 	}
 
-	public int calculateDelta(int originalNum, int newNum){
-		int delta = newNum - originalNum;
-		if (delta < 0){
-			delta = 0;
-		}
-		return delta;
-	}
-
-
-    protected void prepareStep(SimState state){
-		converted_NC_to_WC = false;
-		converted_WC_to_NC = false;
-        String graphStructure = JaipurABM.getGraphStructure();
-        if (graphStructure.equalsIgnoreCase("original")){
-            double timeStep = state.schedule.getTime();
-            assignFamilyToAgentAtTimeStep(timeStep);
-            assignCloseFriendsAtTimeStep(timeStep);
-            assignAcquaintancesToAgentAtTimeStep(timeStep);
-        }
-        else{
-			setNeighborArrayFromGraph(JaipurABM.getGraph());
-		}
-    }
-
-    public void assignAcquaintancesToAgentAtTimeStep(double timeStep) {
-        if (acquaintances.size() == maxNumAcquaintances || remainingConnections <= 0) {
-            return;
-        }
-
-        List<Household> availableHouseholds = houseHoldAgents.stream()
-                .filter(h -> h.uuid != uuid)
-                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
-                .filter(h -> h.timeStepBorn <= timeStep)
-                .filter(h -> h.remainingConnections > 0)
-                .filter(h -> h.acquaintances.size() < h.maxNumAcquaintances)
-                .collect(Collectors.toList());
-
-		Collections.shuffle(availableHouseholds);
-
-        for (Household hh : availableHouseholds) {
-            // Check if any remaining connections available
-            if (acquaintances.size() == maxNumAcquaintances || remainingConnections <= 0) {
-                return;
-            }
-
-            acquaintances.add(hh);
-            hh.acquaintances.add(this);
-
-			relatedUuids.add(hh.uuid);
-			hh.relatedUuids.add(uuid);
-
-			this.remainingConnections--;
-			hh.remainingConnections--;
-
-//            String msg = String.format("%1$s related %2$s as acquaintances", vertexName, hh.vertexName);
-//            System.out.println(msg);
-        }
-    }
-
-	public void assignFamilyToAgentAtTimeStep(double timeStep) {
-        if (respectedFamilyMembers.size() == maxNumFamilyMembers || remainingConnections <= 0) {
-            return;
-        }
-
-        List<Household> availableHouseholds = houseHoldAgents.stream()
-                .filter(h -> h.uuid != uuid)
-                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
-                .filter(h -> h.timeStepBorn <= timeStep)
-                .filter(h -> h.remainingConnections > 0)
-                .filter(h -> h.acquaintances.size() < h.maxNumAcquaintances)
-                .collect(Collectors.toList());
-
-		Collections.shuffle(availableHouseholds);
-
-		for (Household hh : availableHouseholds) {
-            // Check if any remaining connections available
-            if (respectedFamilyMembers.size() == maxNumFamilyMembers || remainingConnections <= 0) {
-                return;
-            }
-
-            respectedFamilyMembers.add(hh);
-            hh.acquaintances.add(this);
-
-			relatedUuids.add(hh.uuid);
-			hh.relatedUuids.add(uuid);
-
-			this.remainingConnections--;
-			hh.remainingConnections--;
-		}
-	}
-
-    private void assignCloseFriendsAtTimeStep(double timeStep) {
-        if (closeFriends.size() == maxNumCloseFriends || remainingConnections <= 0) {
-            return;
-        }
-
-        List<Household> availableHouseholds = houseHoldAgents.stream()
-                .filter(h -> h.uuid != uuid)
-                .filter(h -> h.doesRelationshipAlreadyExist(uuid) == false)
-                .filter(h -> h.timeStepBorn <= timeStep)
-                .filter(h -> h.remainingConnections > 0)
-                .filter(h -> h.closeFriends.size() < h.maxNumCloseFriends)
-                .collect(Collectors.toList());
-
-		Collections.shuffle(availableHouseholds);
-
-        for (Household hh : availableHouseholds) {
-            // Check if any remaining connections available
-            if (closeFriends.size() == maxNumCloseFriends || remainingConnections <= 0) {
-                return;
-            }
-
-            closeFriends.add(hh);
-            hh.closeFriends.add(this);
-
-			relatedUuids.add(hh.uuid);
-			hh.relatedUuids.add(uuid);
-
-			this.remainingConnections--;
-			hh.remainingConnections--;
-
-//            String msg = String.format("%1$s related %2$s as friends", vertexName, hh.vertexName);
-//            System.out.println(msg);
-        }
-    }
-
-	private boolean doesRelationshipAlreadyExist(UUID targetUuid){
-		return relatedUuids.contains(targetUuid);
-    }
-
-	private void talk(ArrayList<Household> wholeNetwork, ArrayList<Household> networkTalkedToAlready, SimState state){
-		//select random member of arrayList, then, if he doesn't already exist in the talkedTo list, add him. if he does, return and let the next agent go
-		if(shouldSkipStep(numSkippedStepsTalkUpdate)){
-			return;
-		}
-		ArrayList<Household> shuffledNetwork = wholeNetwork;
-		Collections.shuffle(shuffledNetwork);
-		Household randHH = null;
-		if(shuffledNetwork.isEmpty()){
-			return;
-		}
-		//added to get new network structures to change over time
-		for (Household hh : shuffledNetwork){
-			double currentTimeStep = state.schedule.getTime();
-			if(hh.timeStepBorn > currentTimeStep){
-				//System.out.println(hh.getVertexName() + "was born at time step " + hh.timeStepBorn + " and current time step is " + state.schedule.getTime());
-				continue;
+	/**
+	 * Calculate utility for behaviors if agent has only one type of neighboring agents (acquaintances only) and update
+	 * status
+	 * @param exogTermDrought
+	 */
+	private void calculateUtilFor1Network(double exogTermDrought){
+		if (isConserver) {
+			double randNum = rng.nextDouble(true, false);
+			double utilStay = UtilityFunction.calculateUtilityForConserverStayingConserver1Network(RatioAcqConservers,
+					exogenousTerm, exogTermDrought);
+			double utilChange = UtilityFunction.calculateUtilityForConserverBecomingNonConserver1Network(RatioAcqNonConservers);
+			double probabilityConsToCons = ProbabilityOfBehavior.probabilityConsToCons(utilStay, utilChange);
+			if (randNum >= probabilityConsToCons) {
+				isConserver = false;
 			}
-			else{
-				//check to see if hh has spoken to anyone to avoid nullpointer exception
-				if(networkTalkedToAlready.isEmpty()){
-					randHH = hh;
-					networkTalkedToAlready.add(randHH);
-					return;
-				}		
-				//if the agent already exists in the TalkedToAlready array, the talking agent loses his turn
-				for (Household hhTalkedTo : networkTalkedToAlready){
-					if(hhTalkedTo.uuid == hh.uuid){
-						return;
-					}
-				}
-				randHH = hh;
-				networkTalkedToAlready.add(randHH);
+		} else {
+			double randNum = rng.nextDouble(true, false);
+			double utilStay = UtilityFunction.calculateUtilityForNonConserverStayingNonConserver1Network(RatioAcqNonConservers);
+			double utilChange = UtilityFunction.calculateUtilityForNonConserverBecomingConserver1Network(RatioAcqConservers,
+					exogenousTerm, exogTermDrought);
+			double probabilityNonConsToNonCons = ProbabilityOfBehavior.probabilityNonConsToNonCons(utilChange, utilStay);
+			if (randNum >= probabilityNonConsToNonCons) {
+				isConserver = true;
+			}
+		}
+	}
+
+	/**
+	 * Select an agent to communicate with, then add it to communicated network
+	 * @param networkStructure
+	 * @param state
+	 */
+	private void talk(int networkStructure, SimState state) {
+		int numAgentToTalkTo = dftABM.getCommunicatedAgent(this.vertexIndex, state.schedule.getTime());
+		if (numAgentToTalkTo == -1) {
+			return;
+		}
+		if (networkStructure == 2) {
+			int relNum = dftABM.getTypeOfRelationship(this.vertexIndex, numAgentToTalkTo);
+			if(relNum < 0){
+				return;
+			}
+			findSocialNetworkAndAddAgent(relNum, numAgentToTalkTo, state);
+		}
+		else if (networkStructure == 1 || networkStructure == 3){
+			addtoAcquaintanceNetwork(numAgentToTalkTo);
+		}
+		else{
+			System.out.println("network structure incorrect in talk function: " + networkStructure);
+			System.exit(1);
+		}
+	}
+
+	/**
+	 * Check time step born of agent to make sure it is active
+	 * @param thisTimeStep
+	 * @return whether agent is active
+	 */
+	public boolean existsAtTimeStep(double thisTimeStep){
+		if(thisTimeStep - timeStepBorn ==0 || thisTimeStep - timeStepBorn > 0){
+			return true;
+		}
+		else{
+			return false;
+		}
+	}
+
+	/**
+	 * Add communicated agent to appropriate social network
+	 * @param relNum
+	 * @param numAgentToTalkTo
+	 * @param state
+	 */
+	private void findSocialNetworkAndAddAgent(int relNum, int numAgentToTalkTo, SimState state){
+		if (relNum == 0) {
+			addtoFamNetwork(numAgentToTalkTo);
+		}
+		else if (relNum == 1) {
+			addtoFriendNetwork(numAgentToTalkTo);
+		}
+		else if (relNum == 2) {
+			addtoAcquaintanceNetwork(numAgentToTalkTo);
+		} else {
+			System.out.println("wrong relationships in talk function" + " time step " + state.schedule.getTime());
+		}
+	}
+
+	/**
+	 * Add communicated agent to Family network, and add self to agent's Family network
+	 * @param numAgentToTalkTo
+	 */
+	private void addtoFamNetwork(int numAgentToTalkTo){
+		for(Household hh : famAlreadySpokenTo) {
+			if(hh.getVertexIndex() == numAgentToTalkTo) {
 				return;
 			}
 		}
-		if (randHH == null){
-			System.out.println("talk function: " + this.vertexName + " has no current acquaintances");
-			return;
-		}
+		Household potentialFam = dftABM.network.get(numAgentToTalkTo);
+		famAlreadySpokenTo.add(dftABM.network.get(numAgentToTalkTo));
+		potentialFam.famAlreadySpokenTo.add(this);
 	}
 
-	private void talkToThreeNetworks(SimState state){
-		int num = rng.nextInt(3) + 1;
-		//if num is 1 and fam is empty or if num is 2 and friends are empty or num is 3 and acq is empty, pick a new num
-		while (num == 1 && respectedFamilyMembers.isEmpty() || num == 2 && closeFriends.isEmpty() || num == 3 && acquaintances.isEmpty()){
-			num = rng.nextInt(3) + 1;
+	/**
+	 * Add communicated agent to Friend network, and add self to agent's Friend network
+	 * @param numAgentToTalkTo
+	 */
+	private void addtoFriendNetwork(int numAgentToTalkTo){
+		for(Household hh: friendsAlreadySpokenTo){
+			if(hh.getVertexIndex() == numAgentToTalkTo){
+				return;
+			}
 		}
-
-		//select one network to communicate with for this timestep
-		if (num == 1){
-			//communicate with family
-			talk(respectedFamilyMembers, famAlreadySpokenTo, state);
-		}
-		else if (num == 2){
-			talk(closeFriends, friendsAlreadySpokenTo, state);
-		}
-		else if (num == 3){
-			talk(acquaintances, acqAlreadySpokenTo, state);
-		}
-		else{
-			System.out.println("error in rng for talk method");
-			return;
-		}
+		Household potentialFriend = dftABM.network.get(numAgentToTalkTo);
+		friendsAlreadySpokenTo.add(dftABM.network.get(numAgentToTalkTo));
+		potentialFriend.friendsAlreadySpokenTo.add(this);
 	}
 
+	/**
+	 * Add communicated agent to Acquaintance network, and add self to agent's Acquaintance network
+	 * @param numAgentToTalkTo
+	 */
+	private void addtoAcquaintanceNetwork(int numAgentToTalkTo){
+		for(Household hh: acqAlreadySpokenTo){
+			if(hh.getVertexIndex() == numAgentToTalkTo){
+				return;
+			}
+		}
+		Household potentialAcqToTalkTo = dftABM.network.get(numAgentToTalkTo);
+		this.acqAlreadySpokenTo.add(dftABM.network.get(numAgentToTalkTo));
+		potentialAcqToTalkTo.acqAlreadySpokenTo.add(this);
+	}
+
+	/**
+	 * Calculate whether the agent skips the current time step for an action
+	 * @param numTries
+	 * @return boolean of whether to engage in action
+	 */
 	private boolean shouldSkipStep(int numTries){
+			if (numTries == 0){
+				return false;
+			}
 			double chance = 1.0/numTries;
 			double randNum = rng.nextDouble(true, false);
 		return randNum >= chance;
 	}
 
-	public double getAgentAge(SimState state){
-		double age = state.schedule.getTime() - timeStepBorn;
-		return age;
+	public int getVertexIndex(){ return vertexIndex;}
+
+	public static double getExogenousTermSeed() {
+		return exogenousTermSeed;
 	}
 
-	public UUID getUUID(){	
-		return this.uuid;
+	public int getMaxNumFamilyMembers(){return this.maxNumFamilyMembers;}
+
+	public int getMaxNumCloseFriends(){return this.maxNumCloseFriends;}
+
+	public static void setPercentConsEachTimeStep(double percCons){
+		percentConsEachTimeStep = percCons;
 	}
 
-	public ArrayList<Household> getAcquaintances(){
-		return acquaintances;
+	public static void setPercentInitialCons(double percCons) { percentInitialCons = percCons; }
+
+	public void increaseNumFriends(){this.currentNumCloseFriends++;}
+
+	public void increaseNumFamilyMembers(){this.currentNumFamilyMembers++;}
+
+	public void increaseNumAcquaintances(){this.currentNumAcquaintances++;}
+
+	public static void setUtilSkipStepSeed(int seed){
+		utilSkipStepSeed = seed;
 	}
 
-	public double getTimeStepBorn(){ return timeStepBorn; }
-
-	public boolean has_converted_WC_to_NC_thistimestep(){
-		return converted_WC_to_NC;
+	public static void setTalkSkipStepSeed(int seed){
+		talkSkipStepSeed = seed;
 	}
 
-	public boolean has_converted_NC_to_WC_thistimestep(){return converted_NC_to_WC;}
+    public static void setExogenousTermSeed(double seed) {
+        exogenousTermSeed = seed;
+    }
 
-	public int getFamilySize(){return this.respectedFamilyMembers.size();}
-
-	public int getFriendsSize(){return this.closeFriends.size();}
-
-	public int getAcqSize(){return this.acquaintances.size();}
-
-	public double getRatioFamCons(){return this.RatioFamConservers;}
-
-	public double getRatioFriendsCons(){return this.RatioFriendConservers;}
-
-	public double getRatioAcqCons(){return this.RatioAcqConservers;}
-
-	public double getFamDelta(){ return this.familyDelta;}
-
-	public double getFriendDelta(){return this.friendDelta;}
-
-	public boolean isAgentConserver(){ return this.isConserver;}
-
-	private void setNeighborArrayFromGraph(Graph graph){
-		for(Node n: graph){
-			UUID nodeUUID = n.getAttribute("nodeUUID");
-			if(this.uuid == nodeUUID){
-				this.acquaintances = n.getAttribute("neighborArray");
-				return;
-			}
-		}
+    public static void setExogenousTermDroughtSeed(double seed){
+		exogenousTermDroughtSeed = seed;
 	}
-
-	public static void setPercentConservers(double percCons){
-		percentConservers = percCons;
-	}
-
 }
+
 
