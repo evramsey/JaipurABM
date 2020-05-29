@@ -1,7 +1,5 @@
 Ramsey, E. and Berglund, E.Z. (2020) Developing An Agent-Based Model of Dual-Flush Toilet Adoption. Publication Pending.
 
-DOI:
-
 The model requires the following libraries:
 Multi-Agent Simulation of Networks (MASON)	<https://cs.gmu.edu/~eclab/projects/mason/#Download>
 GraphStream 					<http://graphstream-project.org/download/>
